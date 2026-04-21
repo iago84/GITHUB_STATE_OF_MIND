@@ -1,0 +1,6 @@
+.venv/
+.venv
+__pycache__/
+*.pyc
+patch-68bc261.patch
+patch-68bc261.patch.gz
