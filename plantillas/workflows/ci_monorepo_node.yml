@@ -1,0 +1,28 @@
+name: CI (Node Monorepo)
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+      - name: Install root
+        run: npm ci || npm install
+      - name: Test root
+        run: npm test || echo "No root tests"
+      - name: Test packages
+        run: |
+          if [ -d packages ]; then
+            for d in packages/*; do
+              if [ -f "$d/package.json" ]; then
+                echo "Testing $d"
+                (cd "$d" && npm ci || npm install && npm test || echo "No tests in $d")
+              fi
+            done
+          fi

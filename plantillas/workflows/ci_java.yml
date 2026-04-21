@@ -1,0 +1,20 @@
+name: CI (Java)
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Build & Test (Maven/Gradle)
+        run: |
+          if [ -f mvnw ] || [ -f pom.xml ]; then ./mvnw -q -DskipTests=false test || mvn -q -DskipTests=false test; fi
+          if [ -f gradlew ] || [ -f build.gradle ] || [ -f build.gradle.kts ]; then ./gradlew test || gradle test; fi

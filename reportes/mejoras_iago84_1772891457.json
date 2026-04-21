@@ -1,0 +1,65 @@
+[
+  {
+    "name": "AETHER_COSMO",
+    "executed": [
+      "description_set(dry)",
+      "gitignore_added",
+      "issue_template_bug",
+      "issue_template_feature",
+      "pr_template",
+      "workflow_ai_added",
+      "pages_workflow_added",
+      "pages_index_added",
+      "pages_docsify_sidebar",
+      "pages_docsify_readme",
+      "homepage_set(dry)"
+    ],
+    "diffs": [
+      {
+        "path": ".gitignore",
+        "message": "Add .gitignore",
+        "diff": "--- a/.gitignore\n+++ b/.gitignore\n@@ -0,0 +1,43 @@\n+# Byte-compiled / optimized / DLL files\n+__pycache__/\n+*.py[cod]\n+*$py.class\n+\n+# C extensions\n+*.so\n+\n+# Distribution / packaging\n+.Python\n+build/\n+develop-eggs/\n+dist/\n+downloads/\n+eggs/\n+.eggs/\n+lib/\n+lib64/\n+parts/\n+sdist/\n+var/\n+wheels/\n+pip-wheel-metadata/\n+share/python-wheels/\n+*.egg-info/\n+.installed.cfg\n+*.egg\n+MANIFEST\n+\n+# Virtual environments\n+.venv/\n+venv/\n+ENV/\n+\n+# Pytest\n+.pytest_cache/\n+\n+# Jupyter\n+.ipynb_checkpoints\n+\n+# Mac / Windows\n+.DS_Store\n+Thumbs.db"
+      },
+      {
+        "path": ".github/ISSUE_TEMPLATE/bug_report.md",
+        "message": "Add bug report template",
+        "diff": "--- a/.github/ISSUE_TEMPLATE/bug_report.md\n+++ b/.github/ISSUE_TEMPLATE/bug_report.md\n@@ -0,0 +1,22 @@\n+---\n+name: Bug report\n+about: Reporta un error para ayudarnos a mejorar\n+title: \"[BUG] \"\n+labels: bug\n+assignees: ''\n+---\n+\n+Descripción:\n+\n+Pasos para reproducir:\n+1.\n+2.\n+3.\n+\n+Comportamiento esperado:\n+\n+Capturas / logs:\n+\n+Entorno:\n+- SO:\n+- Versión:"
+      },
+      {
+        "path": ".github/ISSUE_TEMPLATE/feature_request.md",
+        "message": "Add feature request template",
+        "diff": "--- a/.github/ISSUE_TEMPLATE/feature_request.md\n+++ b/.github/ISSUE_TEMPLATE/feature_request.md\n@@ -0,0 +1,17 @@\n+---\n+name: Feature request\n+about: Propón una mejora o nueva funcionalidad\n+title: \"[FEATURE] \"\n+labels: enhancement\n+assignees: ''\n+---\n+\n+Resumen:\n+\n+Motivación / valor:\n+\n+Propuesta:\n+\n+Alternativas consideradas:\n+\n+Notas adicionales:"
+      },
+      {
+        "path": ".github/PULL_REQUEST_TEMPLATE.md",
+        "message": "Add PR template",
+        "diff": "--- a/.github/PULL_REQUEST_TEMPLATE.md\n+++ b/.github/PULL_REQUEST_TEMPLATE.md\n@@ -0,0 +1,15 @@\n+## Descripción\n+\n+\n+## Tipo de cambio\n+- [ ] Bug fix\n+- [ ] Nueva feature\n+- [ ] Refactor / mantenimiento\n+\n+## Checklist\n+- [ ] Tests pasan\n+- [ ] CI pasa\n+- [ ] Documentación actualizada\n+\n+## Notas\n+"
+      },
+      {
+        "path": ".github/workflows/ci.yml",
+        "message": "Add CI workflow AI",
+        "diff": "--- a/.github/workflows/ci.yml\n+++ b/.github/workflows/ci.yml\n@@ -0,0 +1,21 @@\n+name: CI (Python)\n+\n+on:\n+  push:\n+  pull_request:\n+\n+jobs:\n+  test:\n+    runs-on: ubuntu-latest\n+    steps:\n+      - uses: actions/checkout@v4\n+      - uses: actions/setup-python@v5\n+        with:\n+          python-version: '3.x'\n+      - name: Install deps\n+        run: |\n+          python -m pip install --upgrade pip\n+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi\n+      - name: Run tests\n+        run: |\n+          if [ -f pytest.ini ] || [ -d tests ]; then pytest -q || true; else echo \\\"No tests\\\"; fi"
+      },
+      {
+        "path": ".github/workflows/pages.yml",
+        "message": "Add Pages workflow",
+        "diff": "--- a/.github/workflows/pages.yml\n+++ b/.github/workflows/pages.yml\n@@ -0,0 +1,33 @@\n+name: Deploy static site to Pages\n+\n+on:\n+  push:\n+    branches: [\"main\"]\n+\n+permissions:\n+  contents: read\n+  pages: write\n+  id-token: write\n+\n+concurrency:\n+  group: \"pages\"\n+  cancel-in-progress: false\n+\n+jobs:\n+  build:\n+    runs-on: ubuntu-latest\n+    steps:\n+      - uses: actions/checkout@v4\n+      - name: Upload artifact\n+        uses: actions/upload-pages-artifact@v3\n+        with:\n+          path: ./public\n+  deploy:\n+    needs: build\n+    runs-on: ubuntu-latest\n+    environment:\n+      name: github-pages\n+      url: ${{ steps.deployment.outputs.page_url }}\n+    steps:\n+      - id: deployment\n+        uses: actions/deploy-pages@v4"
+      },
+      {
+        "path": "docs/index.html",
+        "message": "Add Pages public index",
+        "diff": "--- a/docs/index.html\n+++ b/docs/index.html\n@@ -0,0 +1,16 @@\n+<!doctype html>\n+<html>\n+<head>\n+  <meta charset=\"utf-8\">\n+  <title>Docs</title>\n+  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n+  <link rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/npm/docsify@4/lib/themes/vue.css\">\n+</head>\n+<body>\n+  <div id=\"app\">Cargando documentación...</div>\n+  <script>\n+    window.$docsify = { name: 'Documentación', loadSidebar: true }\n+  </script>\n+  <script src=\"https://cdn.jsdelivr.net/npm/docsify@4/lib/docsify.min.js\"></script>\n+</body>\n+</html>"
+      },
+      {
+        "path": "docs/_sidebar.md",
+        "message": "Add Docsify _sidebar.md",
+        "diff": "--- a/docs/_sidebar.md\n+++ b/docs/_sidebar.md\n@@ -0,0 +1,5 @@\n+- Introducción\n+- Uso\n+- API\n+- Contribución\n+- Licencia"
+      },
+      {
+        "path": "docs/README.md",
+        "message": "Add Docsify README.md",
+        "diff": "--- a/docs/README.md\n+++ b/docs/README.md\n@@ -0,0 +1,10 @@\n+# Documentación\n+\n+Bienvenido a la documentación del proyecto.\n+\n+- Instala y ejecuta localmente Docsify si lo prefieres:\n+\n+  npm i -g docsify-cli\n+  docsify serve docs\n+\n+Consulta la barra lateral para navegar por secciones."
+      }
+    ]
+  }
+]

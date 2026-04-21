@@ -1,0 +1,171 @@
+[
+  {
+    "name": "OPENSOURCE_BY_NAIRA",
+    "executed": [
+      "issue_template_bug",
+      "issue_template_feature",
+      "pr_template",
+      "readme_generated",
+      "pages_workflow_added",
+      "pages_index_added",
+      "pages_docsify_sidebar",
+      "pages_docsify_readme",
+      "homepage_set(dry)"
+    ],
+    "diffs": [
+      {
+        "path": ".github/ISSUE_TEMPLATE/bug_report.md",
+        "message": "Add bug report template",
+        "diff": "--- a/.github/ISSUE_TEMPLATE/bug_report.md\n+++ b/.github/ISSUE_TEMPLATE/bug_report.md\n@@ -0,0 +1,22 @@\n+---\n+name: Bug report\n+about: Reporta un error para ayudarnos a mejorar\n+title: \"[BUG] \"\n+labels: bug\n+assignees: ''\n+---\n+\n+Descripción:\n+\n+Pasos para reproducir:\n+1.\n+2.\n+3.\n+\n+Comportamiento esperado:\n+\n+Capturas / logs:\n+\n+Entorno:\n+- SO:\n+- Versión:"
+      },
+      {
+        "path": ".github/ISSUE_TEMPLATE/feature_request.md",
+        "message": "Add feature request template",
+        "diff": "--- a/.github/ISSUE_TEMPLATE/feature_request.md\n+++ b/.github/ISSUE_TEMPLATE/feature_request.md\n@@ -0,0 +1,17 @@\n+---\n+name: Feature request\n+about: Propón una mejora o nueva funcionalidad\n+title: \"[FEATURE] \"\n+labels: enhancement\n+assignees: ''\n+---\n+\n+Resumen:\n+\n+Motivación / valor:\n+\n+Propuesta:\n+\n+Alternativas consideradas:\n+\n+Notas adicionales:"
+      },
+      {
+        "path": ".github/PULL_REQUEST_TEMPLATE.md",
+        "message": "Add PR template",
+        "diff": "--- a/.github/PULL_REQUEST_TEMPLATE.md\n+++ b/.github/PULL_REQUEST_TEMPLATE.md\n@@ -0,0 +1,15 @@\n+## Descripción\n+\n+\n+## Tipo de cambio\n+- [ ] Bug fix\n+- [ ] Nueva feature\n+- [ ] Refactor / mantenimiento\n+\n+## Checklist\n+- [ ] Tests pasan\n+- [ ] CI pasa\n+- [ ] Documentación actualizada\n+\n+## Notas\n+"
+      },
+      {
+        "path": "README.md",
+        "message": "Generate README",
+        "diff": "--- a/README.md\n+++ b/README.md\n@@ -0,0 +1,25 @@\n+# OPENSOURCE_BY_NAIRA\n+\n+Open Source Django Apps\n+\n+![License](https://img.shields.io/badge/license-unknown-lightgray) ![CI](https://img.shields.io/github/actions/workflow/status/iago84/OPENSOURCE_BY_NAIRA/ci.yml?branch=master) ![Issues](https://img.shields.io/github/issues/iago84/OPENSOURCE_BY_NAIRA)\n+\n+## Tecnologías\n+\n+N/A\n+\n+## Instalación\n+\n+Pasos de instalación pendientes de definir.\n+\n+## Uso\n+\n+Descripción de uso pendiente de definir.\n+\n+## Contribución\n+\n+Por favor abre un issue o PR. Revisa CODEOWNERS y la plantilla de PR.\n+\n+## Licencia\n+\n+Consulta el archivo LICENSE."
+      },
+      {
+        "path": ".github/workflows/pages.yml",
+        "message": "Add Pages workflow",
+        "diff": "--- a/.github/workflows/pages.yml\n+++ b/.github/workflows/pages.yml\n@@ -0,0 +1,33 @@\n+name: Deploy static site to Pages\n+\n+on:\n+  push:\n+    branches: [\"main\"]\n+\n+permissions:\n+  contents: read\n+  pages: write\n+  id-token: write\n+\n+concurrency:\n+  group: \"pages\"\n+  cancel-in-progress: false\n+\n+jobs:\n+  build:\n+    runs-on: ubuntu-latest\n+    steps:\n+      - uses: actions/checkout@v4\n+      - name: Upload artifact\n+        uses: actions/upload-pages-artifact@v3\n+        with:\n+          path: ./public\n+  deploy:\n+    needs: build\n+    runs-on: ubuntu-latest\n+    environment:\n+      name: github-pages\n+      url: ${{ steps.deployment.outputs.page_url }}\n+    steps:\n+      - id: deployment\n+        uses: actions/deploy-pages@v4"
+      },
+      {
+        "path": "docs/index.html",
+        "message": "Add Pages public index",
+        "diff": "--- a/docs/index.html\n+++ b/docs/index.html\n@@ -0,0 +1,16 @@\n+<!doctype html>\n+<html>\n+<head>\n+  <meta charset=\"utf-8\">\n+  <title>Docs</title>\n+  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n+  <link rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/npm/docsify@4/lib/themes/vue.css\">\n+</head>\n+<body>\n+  <div id=\"app\">Cargando documentación...</div>\n+  <script>\n+    window.$docsify = { name: 'Documentación', loadSidebar: true }\n+  </script>\n+  <script src=\"https://cdn.jsdelivr.net/npm/docsify@4/lib/docsify.min.js\"></script>\n+</body>\n+</html>"
+      },
+      {
+        "path": "docs/_sidebar.md",
+        "message": "Add Docsify _sidebar.md",
+        "diff": "--- a/docs/_sidebar.md\n+++ b/docs/_sidebar.md\n@@ -0,0 +1,5 @@\n+- Introducción\n+- Uso\n+- API\n+- Contribución\n+- Licencia"
+      },
+      {
+        "path": "docs/README.md",
+        "message": "Add Docsify README.md",
+        "diff": "--- a/docs/README.md\n+++ b/docs/README.md\n@@ -0,0 +1,10 @@\n+# Documentación\n+\n+Bienvenido a la documentación del proyecto.\n+\n+- Instala y ejecuta localmente Docsify si lo prefieres:\n+\n+  npm i -g docsify-cli\n+  docsify serve docs\n+\n+Consulta la barra lateral para navegar por secciones."
+      }
+    ]
+  },
+  {
+    "name": "SIMPLY_POETRY",
+    "executed": [
+      "issue_template_bug",
+      "issue_template_feature",
+      "pr_template",
+      "readme_generated",
+      "pages_workflow_added",
+      "pages_index_added",
+      "pages_docsify_sidebar",
+      "pages_docsify_readme",
+      "homepage_set(dry)"
+    ],
+    "diffs": [
+      {
+        "path": ".github/ISSUE_TEMPLATE/bug_report.md",
+        "message": "Add bug report template",
+        "diff": "--- a/.github/ISSUE_TEMPLATE/bug_report.md\n+++ b/.github/ISSUE_TEMPLATE/bug_report.md\n@@ -0,0 +1,22 @@\n+---\n+name: Bug report\n+about: Reporta un error para ayudarnos a mejorar\n+title: \"[BUG] \"\n+labels: bug\n+assignees: ''\n+---\n+\n+Descripción:\n+\n+Pasos para reproducir:\n+1.\n+2.\n+3.\n+\n+Comportamiento esperado:\n+\n+Capturas / logs:\n+\n+Entorno:\n+- SO:\n+- Versión:"
+      },
+      {
+        "path": ".github/ISSUE_TEMPLATE/feature_request.md",
+        "message": "Add feature request template",
+        "diff": "--- a/.github/ISSUE_TEMPLATE/feature_request.md\n+++ b/.github/ISSUE_TEMPLATE/feature_request.md\n@@ -0,0 +1,17 @@\n+---\n+name: Feature request\n+about: Propón una mejora o nueva funcionalidad\n+title: \"[FEATURE] \"\n+labels: enhancement\n+assignees: ''\n+---\n+\n+Resumen:\n+\n+Motivación / valor:\n+\n+Propuesta:\n+\n+Alternativas consideradas:\n+\n+Notas adicionales:"
+      },
+      {
+        "path": ".github/PULL_REQUEST_TEMPLATE.md",
+        "message": "Add PR template",
+        "diff": "--- a/.github/PULL_REQUEST_TEMPLATE.md\n+++ b/.github/PULL_REQUEST_TEMPLATE.md\n@@ -0,0 +1,15 @@\n+## Descripción\n+\n+\n+## Tipo de cambio\n+- [ ] Bug fix\n+- [ ] Nueva feature\n+- [ ] Refactor / mantenimiento\n+\n+## Checklist\n+- [ ] Tests pasan\n+- [ ] CI pasa\n+- [ ] Documentación actualizada\n+\n+## Notas\n+"
+      },
+      {
+        "path": "README.md",
+        "message": "Generate README",
+        "diff": "--- a/README.md\n+++ b/README.md\n@@ -0,0 +1,25 @@\n+# SIMPLY_POETRY\n+\n+POETRY BLOG APP TYPE\n+\n+![License](https://img.shields.io/badge/license-unknown-lightgray) ![CI](https://img.shields.io/github/actions/workflow/status/iago84/SIMPLY_POETRY/ci.yml?branch=master) ![Issues](https://img.shields.io/github/issues/iago84/SIMPLY_POETRY)\n+\n+## Tecnologías\n+\n+N/A\n+\n+## Instalación\n+\n+Pasos de instalación pendientes de definir.\n+\n+## Uso\n+\n+Descripción de uso pendiente de definir.\n+\n+## Contribución\n+\n+Por favor abre un issue o PR. Revisa CODEOWNERS y la plantilla de PR.\n+\n+## Licencia\n+\n+Consulta el archivo LICENSE."
+      },
+      {
+        "path": ".github/workflows/pages.yml",
+        "message": "Add Pages workflow",
+        "diff": "--- a/.github/workflows/pages.yml\n+++ b/.github/workflows/pages.yml\n@@ -0,0 +1,33 @@\n+name: Deploy static site to Pages\n+\n+on:\n+  push:\n+    branches: [\"main\"]\n+\n+permissions:\n+  contents: read\n+  pages: write\n+  id-token: write\n+\n+concurrency:\n+  group: \"pages\"\n+  cancel-in-progress: false\n+\n+jobs:\n+  build:\n+    runs-on: ubuntu-latest\n+    steps:\n+      - uses: actions/checkout@v4\n+      - name: Upload artifact\n+        uses: actions/upload-pages-artifact@v3\n+        with:\n+          path: ./public\n+  deploy:\n+    needs: build\n+    runs-on: ubuntu-latest\n+    environment:\n+      name: github-pages\n+      url: ${{ steps.deployment.outputs.page_url }}\n+    steps:\n+      - id: deployment\n+        uses: actions/deploy-pages@v4"
+      },
+      {
+        "path": "docs/index.html",
+        "message": "Add Pages public index",
+        "diff": "--- a/docs/index.html\n+++ b/docs/index.html\n@@ -0,0 +1,16 @@\n+<!doctype html>\n+<html>\n+<head>\n+  <meta charset=\"utf-8\">\n+  <title>Docs</title>\n+  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n+  <link rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/npm/docsify@4/lib/themes/vue.css\">\n+</head>\n+<body>\n+  <div id=\"app\">Cargando documentación...</div>\n+  <script>\n+    window.$docsify = { name: 'Documentación', loadSidebar: true }\n+  </script>\n+  <script src=\"https://cdn.jsdelivr.net/npm/docsify@4/lib/docsify.min.js\"></script>\n+</body>\n+</html>"
+      },
+      {
+        "path": "docs/_sidebar.md",
+        "message": "Add Docsify _sidebar.md",
+        "diff": "--- a/docs/_sidebar.md\n+++ b/docs/_sidebar.md\n@@ -0,0 +1,5 @@\n+- Introducción\n+- Uso\n+- API\n+- Contribución\n+- Licencia"
+      },
+      {
+        "path": "docs/README.md",
+        "message": "Add Docsify README.md",
+        "diff": "--- a/docs/README.md\n+++ b/docs/README.md\n@@ -0,0 +1,10 @@\n+# Documentación\n+\n+Bienvenido a la documentación del proyecto.\n+\n+- Instala y ejecuta localmente Docsify si lo prefieres:\n+\n+  npm i -g docsify-cli\n+  docsify serve docs\n+\n+Consulta la barra lateral para navegar por secciones."
+      }
+    ]
+  },
+  {
+    "name": "WIN11-BEST-PERFORMANCE",
+    "executed": [
+      "description_set(dry)",
+      "issue_template_bug",
+      "issue_template_feature",
+      "pr_template",
+      "readme_generated",
+      "pages_workflow_added",
+      "pages_index_added",
+      "pages_docsify_sidebar",
+      "pages_docsify_readme",
+      "homepage_set(dry)"
+    ],
+    "diffs": [
+      {
+        "path": ".github/ISSUE_TEMPLATE/bug_report.md",
+        "message": "Add bug report template",
+        "diff": "--- a/.github/ISSUE_TEMPLATE/bug_report.md\n+++ b/.github/ISSUE_TEMPLATE/bug_report.md\n@@ -0,0 +1,22 @@\n+---\n+name: Bug report\n+about: Reporta un error para ayudarnos a mejorar\n+title: \"[BUG] \"\n+labels: bug\n+assignees: ''\n+---\n+\n+Descripción:\n+\n+Pasos para reproducir:\n+1.\n+2.\n+3.\n+\n+Comportamiento esperado:\n+\n+Capturas / logs:\n+\n+Entorno:\n+- SO:\n+- Versión:"
+      },
+      {
+        "path": ".github/ISSUE_TEMPLATE/feature_request.md",
+        "message": "Add feature request template",
+        "diff": "--- a/.github/ISSUE_TEMPLATE/feature_request.md\n+++ b/.github/ISSUE_TEMPLATE/feature_request.md\n@@ -0,0 +1,17 @@\n+---\n+name: Feature request\n+about: Propón una mejora o nueva funcionalidad\n+title: \"[FEATURE] \"\n+labels: enhancement\n+assignees: ''\n+---\n+\n+Resumen:\n+\n+Motivación / valor:\n+\n+Propuesta:\n+\n+Alternativas consideradas:\n+\n+Notas adicionales:"
+      },
+      {
+        "path": ".github/PULL_REQUEST_TEMPLATE.md",
+        "message": "Add PR template",
+        "diff": "--- a/.github/PULL_REQUEST_TEMPLATE.md\n+++ b/.github/PULL_REQUEST_TEMPLATE.md\n@@ -0,0 +1,15 @@\n+## Descripción\n+\n+\n+## Tipo de cambio\n+- [ ] Bug fix\n+- [ ] Nueva feature\n+- [ ] Refactor / mantenimiento\n+\n+## Checklist\n+- [ ] Tests pasan\n+- [ ] CI pasa\n+- [ ] Documentación actualizada\n+\n+## Notas\n+"
+      },
+      {
+        "path": "README.md",
+        "message": "Generate README",
+        "diff": "--- a/README.md\n+++ b/README.md\n@@ -0,0 +1,25 @@\n+# WIN11-BEST-PERFORMANCE\n+\n+Descripción del proyecto.\n+\n+![License](https://img.shields.io/badge/license-unknown-lightgray) ![CI](https://img.shields.io/github/actions/workflow/status/iago84/WIN11-BEST-PERFORMANCE/ci.yml?branch=main) ![Issues](https://img.shields.io/github/issues/iago84/WIN11-BEST-PERFORMANCE)\n+\n+## Tecnologías\n+\n+N/A\n+\n+## Instalación\n+\n+Pasos de instalación pendientes de definir.\n+\n+## Uso\n+\n+Descripción de uso pendiente de definir.\n+\n+## Contribución\n+\n+Por favor abre un issue o PR. Revisa CODEOWNERS y la plantilla de PR.\n+\n+## Licencia\n+\n+Consulta el archivo LICENSE."
+      },
+      {
+        "path": ".github/workflows/pages.yml",
+        "message": "Add Pages workflow",
+        "diff": "--- a/.github/workflows/pages.yml\n+++ b/.github/workflows/pages.yml\n@@ -0,0 +1,33 @@\n+name: Deploy static site to Pages\n+\n+on:\n+  push:\n+    branches: [\"main\"]\n+\n+permissions:\n+  contents: read\n+  pages: write\n+  id-token: write\n+\n+concurrency:\n+  group: \"pages\"\n+  cancel-in-progress: false\n+\n+jobs:\n+  build:\n+    runs-on: ubuntu-latest\n+    steps:\n+      - uses: actions/checkout@v4\n+      - name: Upload artifact\n+        uses: actions/upload-pages-artifact@v3\n+        with:\n+          path: ./public\n+  deploy:\n+    needs: build\n+    runs-on: ubuntu-latest\n+    environment:\n+      name: github-pages\n+      url: ${{ steps.deployment.outputs.page_url }}\n+    steps:\n+      - id: deployment\n+        uses: actions/deploy-pages@v4"
+      },
+      {
+        "path": "docs/index.html",
+        "message": "Add Pages public index",
+        "diff": "--- a/docs/index.html\n+++ b/docs/index.html\n@@ -0,0 +1,16 @@\n+<!doctype html>\n+<html>\n+<head>\n+  <meta charset=\"utf-8\">\n+  <title>Docs</title>\n+  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n+  <link rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/npm/docsify@4/lib/themes/vue.css\">\n+</head>\n+<body>\n+  <div id=\"app\">Cargando documentación...</div>\n+  <script>\n+    window.$docsify = { name: 'Documentación', loadSidebar: true }\n+  </script>\n+  <script src=\"https://cdn.jsdelivr.net/npm/docsify@4/lib/docsify.min.js\"></script>\n+</body>\n+</html>"
+      },
+      {
+        "path": "docs/_sidebar.md",
+        "message": "Add Docsify _sidebar.md",
+        "diff": "--- a/docs/_sidebar.md\n+++ b/docs/_sidebar.md\n@@ -0,0 +1,5 @@\n+- Introducción\n+- Uso\n+- API\n+- Contribución\n+- Licencia"
+      },
+      {
+        "path": "docs/README.md",
+        "message": "Add Docsify README.md",
+        "diff": "--- a/docs/README.md\n+++ b/docs/README.md\n@@ -0,0 +1,10 @@\n+# Documentación\n+\n+Bienvenido a la documentación del proyecto.\n+\n+- Instala y ejecuta localmente Docsify si lo prefieres:\n+\n+  npm i -g docsify-cli\n+  docsify serve docs\n+\n+Consulta la barra lateral para navegar por secciones."
+      }
+    ]
+  }
+]

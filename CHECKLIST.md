@@ -1,0 +1,22 @@
+# Checklist de Optimización de Repos GitHub
+
+- [ ] Definir GITHUB_TOKEN en entorno para lectura/escritura
+- [ ] Ejecutar auditoría de estado (GUI o CLI)
+- [ ] Ejecutar análisis profundo y exportar reporte
+- [ ] Asegurar rama main existente
+- [ ] Establecer main como rama por defecto
+- [ ] Proteger rama main con política mínima
+- [ ] Añadir/validar README personalizado
+- [ ] Añadir/validar LICENSE adecuada
+- [ ] Añadir/validar CODEOWNERS
+- [ ] Añadir/validar .editorconfig
+- [ ] Añadir workflows CI por tecnología (AI)
+- [ ] Configurar GitHub Pages para sitios estáticos
+- [ ] Añadir .gitignore por tecnología
+- [ ] Añadir plantillas de Issues/PRs
+- [ ] Habilitar Issues
+- [ ] Añadir topics relevantes
+- [ ] Completar descripción/homepage
+- [ ] Exportar reportes finales (JSON/CSV/HTML)
+- [ ] Revisar límites de API y ajustar concurrencia
+- [ ] Crear PRs de housekeeping cuando convenga

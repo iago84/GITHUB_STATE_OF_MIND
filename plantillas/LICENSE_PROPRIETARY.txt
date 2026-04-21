@@ -1,0 +1,7 @@
+All Rights Reserved
+
+Copyright (c) {{YEAR}} {{OWNER}}
+
+This software and associated documentation files (the "Software") are the    property of the copyright holder. Unauthorized copying, distribution,         modification, or use of the Software, in whole or in part, is strictly        prohibited without explicit written permission from the copyright holder.     
+
+No license or rights are granted by implication or otherwise.
