@@ -1,0 +1,8 @@
+[
+  {
+    "name": "ci.yml",
+    "path": ".github/workflows/ci.yml",
+    "type": "file"
+  }
+]
+

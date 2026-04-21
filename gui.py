@@ -1,11 +1,12 @@
 import sys
 import time
+import json
 import difflib
 from pathlib import Path
 from typing import Dict, List
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
-from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QComboBox, QCheckBox, QSpinBox, QFileDialog, QTableWidget, QTableWidgetItem, QAbstractItemView, QMessageBox, QGroupBox, QTextEdit
-from gh_manager import GitHubClient, RepoAnalyzer, Optimizer, DeepAnalyzer, LicenseAdvisor, ReadmeGenerator, write_json, write_csv, write_html
+from PyQt6.QtWidgets import QApplication, QDialog, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QComboBox, QCheckBox, QSpinBox, QFileDialog, QTableWidget, QTableWidgetItem, QAbstractItemView, QMessageBox, QGroupBox, QTextEdit
+from gh_manager import AuditLogger, FixtureGitHubClient, GitHubClient, RepoAnalyzer, Optimizer, DeepAnalyzer, LicenseAdvisor, ReadmeGenerator, write_json, write_csv, write_html
 
 
 class Worker(QThread):
@@ -20,8 +21,21 @@ class Worker(QThread):
         self.params = params
 
     def run(self):
+        audit = None
         try:
-            gh = GitHubClient(token=self.params.get("token"))
+            cfg = {}
+            cfg_path = self.params.get("config")
+            if cfg_path and Path(cfg_path).exists():
+                try:
+                    cfg = json.loads(Path(cfg_path).read_text(encoding="utf-8"))
+                except Exception:
+                    cfg = {}
+            audit_path = self.params.get("audit_file")
+            audit = AuditLogger(audit_path) if audit_path else None
+            if self.params.get("offline"):
+                gh = FixtureGitHubClient(self.params.get("fixtures_dir", "fixtures/sample"), token=self.params.get("token"), audit=audit)
+            else:
+                gh = GitHubClient(token=self.params.get("token"), audit=audit)
             owner = self.params["owner"]
             owner_type = self.params["owner_type"]
             visibility = self.params.get("visibility", "all")
@@ -39,6 +53,12 @@ class Worker(QThread):
                 analyzer = RepoAnalyzer(gh, owner, target_branch_name=target_branch, concurrency=concurrency)
                 status_rows = analyzer.summarize(subset)
                 templates: Dict[str, str] = {}
+                cfg_tpl = cfg.get("templates") if isinstance(cfg.get("templates"), dict) else {}
+                if isinstance(cfg_tpl, dict):
+                    for k in ("readme", "license", "codeowners", "editorconfig", "workflow_ci"):
+                        v = cfg_tpl.get(k)
+                        if v and k not in templates and Path(v).exists():
+                            templates[k] = Path(v).read_text(encoding="utf-8")
                 if self.params.get("tpl_readme"):
                     p = Path(self.params["tpl_readme"])
                     if p.exists():
@@ -81,7 +101,12 @@ class Worker(QThread):
                     default_main=self.params.get("default_main", False),
                 )
                 if self.params.get("dry_run", True):
-                    self.result_ready.emit(plans)
+                    want_diffs = bool(self.params.get("crear_readme") or self.params.get("crear_license") or self.params.get("asegurar_workflows") or self.params.get("crear_codeowners") or self.params.get("crear_editorconfig"))
+                    if want_diffs and plans:
+                        default_branches = {r.get("name"): (r.get("default_branch") or target_branch) for r in status_rows if isinstance(r, dict) and r.get("name")}
+                        self.result_ready.emit(optimizer.preview(plans, default_branches))
+                    else:
+                        self.result_ready.emit(plans)
                     return
                 if self.params.get("crear_pr", False) and self.params.get("branch"):
                     base_branch = status_rows[0].get("default_branch") or target_branch if status_rows else target_branch
@@ -154,7 +179,8 @@ class Worker(QThread):
                     if base_actions["auto_topics"]:
                         add_topics = set(analysis.get("techs", []))
                         cur_topics = set(gh.get_topics(owner, name))
-                        merged = sorted(cur_topics | add_topics)
+                        extra = cfg.get("topics_extra") if isinstance(cfg.get("topics_extra"), list) else []
+                        merged = sorted(cur_topics | add_topics | set([t for t in extra if isinstance(t, str) and t.strip()]))
                         if merged != list(cur_topics):
                             if gh.set_topics(owner, name, merged):
                                 executed.append("topics_updated")
@@ -250,6 +276,101 @@ class Worker(QThread):
                 return
         except Exception as e:
             self.error.emit(str(e))
+        finally:
+            if audit:
+                audit.close()
+
+
+class ReadmeWizard(QDialog):
+    def __init__(self, owner: str, repo: str, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Asistente README")
+        self.saved_path = None
+        v = QVBoxLayout(self)
+        top = QHBoxLayout()
+        top.addWidget(QLabel("Stack"))
+        self.stack = QComboBox()
+        self.stack.addItems(["Python", "Node", "Go", "Rust", "Java", "Static"])
+        top.addWidget(self.stack)
+        v.addLayout(top)
+        self.preview = QTextEdit()
+        v.addWidget(self.preview)
+        btns = QHBoxLayout()
+        self.btn_save = QPushButton("Guardar")
+        self.btn_close = QPushButton("Cerrar")
+        btns.addWidget(self.btn_save)
+        btns.addWidget(self.btn_close)
+        v.addLayout(btns)
+        self._owner = owner or "OWNER"
+        self._repo = repo or "REPO"
+        self.stack.currentTextChanged.connect(self.render)
+        self.btn_save.clicked.connect(self.save)
+        self.btn_close.clicked.connect(self.reject)
+        self.render()
+
+    def render(self):
+        stack = self.stack.currentText()
+        repo = self._repo
+        owner = self._owner
+        install = ""
+        run_cmd = ""
+        test_cmd = ""
+        if stack == "Python":
+            install = "python -m venv .venv\nsource .venv/bin/activate\npip install -r requirements.txt"
+            run_cmd = "python main.py"
+            test_cmd = "python -m unittest -v"
+        elif stack == "Node":
+            install = "npm install"
+            run_cmd = "npm run dev"
+            test_cmd = "npm test"
+        elif stack == "Go":
+            install = "go mod download"
+            run_cmd = "go run ./..."
+            test_cmd = "go test ./..."
+        elif stack == "Rust":
+            install = "cargo build"
+            run_cmd = "cargo run"
+            test_cmd = "cargo test"
+        elif stack == "Java":
+            install = "mvn -q -DskipTests package"
+            run_cmd = "mvn -q exec:java"
+            test_cmd = "mvn -q test"
+        else:
+            install = "N/A"
+            run_cmd = "Abrir en navegador"
+            test_cmd = "N/A"
+        txt = f"""# {repo}
+
+## Qué es
+
+Repositorio de {owner}.
+
+## Instalación
+
+```bash
+{install}
+```
+
+## Uso
+
+```bash
+{run_cmd}
+```
+
+## Tests
+
+```bash
+{test_cmd}
+```
+"""
+        self.preview.setPlainText(txt)
+
+    def save(self):
+        p, _ = QFileDialog.getSaveFileName(self, "Guardar README", "README.md", "Markdown (*.md);;Todos (*)")
+        if p:
+            Path(p).write_text(self.preview.toPlainText(), encoding="utf-8")
+            self.saved_path = p
+            self.accept()
 
 
 class MainWindow(QMainWindow):
@@ -283,6 +404,17 @@ class MainWindow(QMainWindow):
         top.addWidget(QLabel("Rama objetivo"))
         self.target_branch = QLineEdit("main")
         top.addWidget(self.target_branch)
+        self.cb_offline = QCheckBox("Offline")
+        top.addWidget(self.cb_offline)
+        self.fixtures_dir = QLineEdit("fixtures/sample")
+        top.addWidget(self.fixtures_dir)
+        self.btn_fixtures = QPushButton("Fixtures")
+        top.addWidget(self.btn_fixtures)
+        self.config = QLineEdit()
+        self.config.setPlaceholderText("config.json")
+        top.addWidget(self.config)
+        self.btn_config = QPushButton("Config")
+        top.addWidget(self.btn_config)
         self.btn_status = QPushButton("Listar estado")
         top.addWidget(self.btn_status)
 
@@ -331,10 +463,12 @@ class MainWindow(QMainWindow):
         vv.addLayout(g3)
         g4 = QHBoxLayout()
         self.btn_tpl_readme = QPushButton("Plantilla README")
+        self.btn_readme_wizard = QPushButton("Asistente README")
         self.btn_tpl_license = QPushButton("Plantilla LICENSE")
         self.btn_tpl_codeowners = QPushButton("Plantilla CODEOWNERS")
         self.btn_tpl_editorconfig = QPushButton("Plantilla .editorconfig")
         g4.addWidget(self.btn_tpl_readme)
+        g4.addWidget(self.btn_readme_wizard)
         g4.addWidget(self.btn_tpl_license)
         g4.addWidget(self.btn_tpl_codeowners)
         g4.addWidget(self.btn_tpl_editorconfig)
@@ -345,10 +479,12 @@ class MainWindow(QMainWindow):
         self.btn_export_json = QPushButton("Exportar JSON")
         self.btn_export_csv = QPushButton("Exportar CSV")
         self.btn_export_html = QPushButton("Exportar HTML")
+        self.btn_save_log = QPushButton("Guardar log")
         self.btn_apply = QPushButton("Aplicar")
         export.addWidget(self.btn_export_json)
         export.addWidget(self.btn_export_csv)
         export.addWidget(self.btn_export_html)
+        export.addWidget(self.btn_save_log)
         export.addWidget(self.btn_apply)
         v.addLayout(export)
 
@@ -413,7 +549,11 @@ class MainWindow(QMainWindow):
         self.btn_export_json.clicked.connect(lambda: self.export_rows("json"))
         self.btn_export_csv.clicked.connect(lambda: self.export_rows("csv"))
         self.btn_export_html.clicked.connect(lambda: self.export_rows("html"))
+        self.btn_save_log.clicked.connect(self.save_log)
+        self.btn_fixtures.clicked.connect(self.pick_fixtures_dir)
+        self.btn_config.clicked.connect(self.pick_config)
         self.btn_tpl_readme.clicked.connect(lambda: self.pick_tpl("readme"))
+        self.btn_readme_wizard.clicked.connect(self.open_readme_wizard)
         self.btn_tpl_license.clicked.connect(lambda: self.pick_tpl("license"))
         self.btn_tpl_codeowners.clicked.connect(lambda: self.pick_tpl("codeowners"))
         self.btn_tpl_editorconfig.clicked.connect(lambda: self.pick_tpl("editorconfig"))
@@ -439,6 +579,83 @@ class MainWindow(QMainWindow):
                 self.tpl_editorconfig = p
             self.log_msg(f"Plantilla {kind}: {p}")
 
+    def open_readme_wizard(self):
+        owner = self.owner.text().strip()
+        selected = self.selected_repo_names()
+        repo = selected[0] if len(selected) == 1 else ""
+        dlg = ReadmeWizard(owner, repo, self)
+        if dlg.exec() == QDialog.DialogCode.Accepted and dlg.saved_path:
+            self.tpl_readme = dlg.saved_path
+            self.log_msg(f"Plantilla readme (wizard): {dlg.saved_path}")
+
+    def pick_fixtures_dir(self):
+        p = QFileDialog.getExistingDirectory(self, "Selecciona carpeta de fixtures", self.fixtures_dir.text().strip() or "")
+        if p:
+            self.fixtures_dir.setText(p)
+            self.log_msg(f"Fixtures: {p}")
+
+    def pick_config(self):
+        p, _ = QFileDialog.getOpenFileName(self, "Selecciona config.json", "", "JSON (*.json);;Todos (*)")
+        if p:
+            self.config.setText(p)
+            self.log_msg(f"Config: {p}")
+            try:
+                cfg = json.loads(Path(p).read_text(encoding="utf-8"))
+            except Exception:
+                return
+            defaults = cfg.get("defaults") if isinstance(cfg, dict) else {}
+            if not isinstance(defaults, dict):
+                return
+            tb = None
+            if isinstance(defaults.get("branch_objetivo"), str) and defaults.get("branch_objetivo").strip():
+                tb = defaults.get("branch_objetivo").strip()
+            if isinstance(defaults.get("target_branch"), str) and defaults.get("target_branch").strip():
+                tb = defaults.get("target_branch").strip()
+            if tb:
+                self.target_branch.setText(tb)
+            if isinstance(defaults.get("crear_readme"), bool):
+                self.cb_readme.setChecked(defaults["crear_readme"])
+            if isinstance(defaults.get("crear_license"), str):
+                self.cb_license.setChecked(bool(defaults["crear_license"]))
+            if isinstance(defaults.get("asegurar_workflows"), bool):
+                self.cb_workflows.setChecked(defaults["asegurar_workflows"])
+            if isinstance(defaults.get("habilitar_issues"), bool):
+                self.cb_issues.setChecked(defaults["habilitar_issues"])
+            if isinstance(defaults.get("crear_codeowners"), bool):
+                self.cb_codeowners.setChecked(defaults["crear_codeowners"])
+            if isinstance(defaults.get("crear_editorconfig"), bool):
+                self.cb_editorconfig.setChecked(defaults["crear_editorconfig"])
+            if isinstance(defaults.get("proteger_branch"), bool):
+                self.cb_protect.setChecked(defaults["proteger_branch"])
+            if isinstance(defaults.get("renombrar_branch"), bool):
+                self.cb_rename.setChecked(defaults["renombrar_branch"])
+            if isinstance(defaults.get("asegurar_main"), bool):
+                self.cb_main.setChecked(defaults["asegurar_main"])
+            if isinstance(defaults.get("default_main"), bool):
+                self.cb_default_main.setChecked(defaults["default_main"])
+            if isinstance(defaults.get("auto_topics"), bool):
+                self.cb_auto_topics.setChecked(defaults["auto_topics"])
+            if isinstance(defaults.get("auto_description"), bool):
+                self.cb_auto_desc.setChecked(defaults["auto_description"])
+            if isinstance(defaults.get("gitignore_auto"), bool):
+                self.cb_gitignore.setChecked(defaults["gitignore_auto"])
+            if isinstance(defaults.get("issues_templates"), bool):
+                self.cb_issue_tpl.setChecked(defaults["issues_templates"])
+            if isinstance(defaults.get("pr_template"), bool):
+                self.cb_pr_tpl.setChecked(defaults["pr_template"])
+            if isinstance(defaults.get("generar_readme_auto"), bool):
+                self.cb_readme_auto.setChecked(defaults["generar_readme_auto"])
+            if isinstance(defaults.get("forzar_readme"), bool):
+                self.cb_readme_force.setChecked(defaults["forzar_readme"])
+            if isinstance(defaults.get("recomendar_licencia"), bool):
+                self.cb_lic_rec.setChecked(defaults["recomendar_licencia"])
+            if isinstance(defaults.get("aplicar_licencia"), bool):
+                self.cb_lic_apply.setChecked(defaults["aplicar_licencia"])
+            if isinstance(defaults.get("workflows_ai"), bool):
+                self.cb_wf_ai.setChecked(defaults["workflows_ai"])
+            if isinstance(defaults.get("pages_static"), bool):
+                self.cb_pages.setChecked(defaults["pages_static"])
+
     def load_status(self):
         token = self.token.text().strip() or None
         owner = self.owner.text().strip()
@@ -452,6 +669,9 @@ class MainWindow(QMainWindow):
             "visibility": self.visibility.currentText(),
             "concurrency": self.concurrency.value(),
             "target_branch": self.target_branch.text().strip() or "main",
+            "offline": self.cb_offline.isChecked(),
+            "fixtures_dir": self.fixtures_dir.text().strip() or "fixtures/sample",
+            "config": self.config.text().strip() or None,
         }
         self.worker = Worker("status", params)
         self.worker.status_ready.connect(self.show_status)
@@ -493,6 +713,9 @@ class MainWindow(QMainWindow):
         if not owner:
             QMessageBox.warning(self, "Error", "Debes indicar owner")
             return
+        out_dir = Path("reportes")
+        out_dir.mkdir(parents=True, exist_ok=True)
+        audit_file = str(out_dir / f"audit_gui_{int(time.time())}.jsonl")
         params = {
             "token": token,
             "owner": owner,
@@ -500,6 +723,10 @@ class MainWindow(QMainWindow):
             "visibility": self.visibility.currentText(),
             "concurrency": self.concurrency.value(),
             "target_branch": self.target_branch.text().strip() or "main",
+            "audit_file": audit_file,
+            "offline": self.cb_offline.isChecked(),
+            "fixtures_dir": self.fixtures_dir.text().strip() or "fixtures/sample",
+            "config": self.config.text().strip() or None,
             "selected_names": self.selected_repo_names(),
             "crear_readme": self.cb_readme.isChecked(),
             "crear_license": "mit" if self.cb_license.isChecked() else None,
@@ -538,6 +765,9 @@ class MainWindow(QMainWindow):
             "visibility": self.visibility.currentText(),
             "concurrency": self.concurrency.value(),
             "selected_names": self.selected_repo_names(),
+            "offline": self.cb_offline.isChecked(),
+            "fixtures_dir": self.fixtures_dir.text().strip() or "fixtures/sample",
+            "config": self.config.text().strip() or None,
         }
         self.worker = Worker("analyze", params)
         self.worker.result_ready.connect(self.show_analysis)
@@ -550,13 +780,20 @@ class MainWindow(QMainWindow):
         if not owner:
             QMessageBox.warning(self, "Error", "Debes indicar owner")
             return
+        out_dir = Path("reportes")
+        out_dir.mkdir(parents=True, exist_ok=True)
+        audit_file = str(out_dir / f"audit_gui_{int(time.time())}.jsonl")
         params = {
             "token": token,
             "owner": owner,
             "owner_type": self.owner_type.currentText(),
             "visibility": self.visibility.currentText(),
             "concurrency": self.concurrency.value(),
+            "audit_file": audit_file,
             "selected_names": self.selected_repo_names(),
+            "offline": self.cb_offline.isChecked(),
+            "fixtures_dir": self.fixtures_dir.text().strip() or "fixtures/sample",
+            "config": self.config.text().strip() or None,
             "auto_topics": self.cb_auto_topics.isChecked(),
             "auto_description": self.cb_auto_desc.isChecked(),
             "gitignore_auto": self.cb_gitignore.isChecked(),
@@ -583,6 +820,12 @@ class MainWindow(QMainWindow):
             self.log_msg("Plan generado")
             for r in rows:
                 self.log_msg(f"{r['name']}: {r['actions']}")
+                if r.get("diffs"):
+                    for d in r.get("diffs", []):
+                        diff_text = d.get("diff") or ""
+                        if diff_text.strip():
+                            self.log_msg(f"{r['name']} {d.get('path','')}: {d.get('message','')}")
+                            self.log_msg(diff_text)
         else:
             self.log_msg("Acciones ejecutadas")
             for r in rows:
@@ -644,6 +887,13 @@ class MainWindow(QMainWindow):
         elif kind == "html":
             write_html(self.rows, p, title="Estado repos")
         self.log_msg(f"Exportado: {p}")
+
+    def save_log(self):
+        ts = int(time.time())
+        p, _ = QFileDialog.getSaveFileName(self, "Guardar log", f"log_{ts}.txt", "Texto (*.txt);;Todos (*)")
+        if p:
+            Path(p).write_text(self.log.toPlainText(), encoding="utf-8")
+            self.log_msg(f"Log guardado: {p}")
 
 
 def main():

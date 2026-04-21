@@ -1,0 +1,12 @@
+{
+  "name": "GITHUB_STATE_OF_MIND",
+  "private": false,
+  "archived": false,
+  "default_branch": "main",
+  "has_issues": true,
+  "open_issues_count": 0,
+  "description": "Herramienta CLI+GUI para auditar y optimizar repositorios GitHub.",
+  "homepage": "",
+  "license": null
+}
+

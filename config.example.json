@@ -1,0 +1,39 @@
+{
+  "defaults": {
+    "branch_objetivo": "main",
+    "visibility": "all",
+    "concurrency": 4,
+    "crear_readme": true,
+    "crear_license": "mit",
+    "asegurar_workflows": true,
+    "habilitar_issues": true,
+    "crear_codeowners": true,
+    "crear_editorconfig": true,
+    "proteger_branch": false,
+    "renombrar_branch": false,
+    "asegurar_main": false,
+    "default_main": false,
+    "auto_topics": true,
+    "auto_description": true,
+    "gitignore_auto": true,
+    "issues_templates": true,
+    "pr_template": true,
+    "generar_readme_auto": true,
+    "forzar_readme": false,
+    "recomendar_licencia": true,
+    "aplicar_licencia": false,
+    "workflows_ai": true,
+    "pages_static": false,
+    "pages_root": "docs",
+    "pages_template": "basic"
+  },
+  "topics_extra": ["automation", "standardization"],
+  "templates": {
+    "readme": "plantillas/README.md",
+    "license": "plantillas/LICENSE_MIT.txt",
+    "codeowners": "plantillas/CODEOWNERS",
+    "editorconfig": "plantillas/.editorconfig",
+    "workflow_ci": "plantillas/ci.yml"
+  }
+}
+

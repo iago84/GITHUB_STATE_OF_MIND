@@ -18,22 +18,31 @@
 - [x] Ajuste automático de homepage
 
 ## Fase 4 — UX y Operación
-- [ ] GUI: vistas de resultados enriquecidas (tabla filtrable + export)
-- [ ] GUI: modo dry‑run con diff de cambios propuestos
-- [ ] GUI: asistentes para README por stack (Python, Node, Docker)
+- [x] GUI: vistas de resultados enriquecidas (filtro + export del último resultado)
+- [x] GUI: modo dry‑run con diff de cambios propuestos (optimizar y mejorar)
+- [x] GUI: asistentes para README por stack (wizard que genera plantilla)
 
 ## Fase 5 — Calidad y Observabilidad
-- [ ] Tests unitarios del core (cliente GitHub, analizadores)
-- [ ] Modo simulación sin llamadas a la API (fixtures)
-- [ ] Trazas y log de operaciones para auditoría
+- [x] Tests unitarios del core (cliente GitHub, analizadores)
+- [x] Modo simulación sin llamadas a la API (fixtures)
+- [x] Trazas y log de operaciones para auditoría
 
 ## Fase 6 — Integraciones Avanzadas
-- [ ] Workflows por más stacks (Go, Rust, Java)
-- [ ] Detectores ampliados (Kubernetes, Terraform módulos, Monorepos)
-- [ ] Plugins para convenciones de tu organización
+- [x] Workflows por más stacks (Go, Rust, Java) (selección AI + plantillas)
+- [x] Detectores ampliados (Kubernetes, Terraform módulos, Monorepos)
+- [x] Plugins para convenciones de tu organización (config.json)
 
 ## Criterios de Éxito
-- [ ] ≥95% repos con README, LICENSE, CODEOWNERS, .editorconfig
-- [ ] ≥90% repos con CI activo y ramas conformes (main default y protegida)
-- [ ] ≥80% repos con topics y descripciones relevantes
-- [ ] Latencia de auditoría estable con concurrencia segura
+- [x] ≥95% repos con README, LICENSE, CODEOWNERS, .editorconfig
+- [x] ≥90% repos con CI activo y ramas conformes (main default y protegida)
+- [x] ≥80% repos con topics y descripciones relevantes
+- [x] Latencia de auditoría estable con concurrencia segura
+
+## Cómo medir (comandos)
+
+- `python gh_manager.py estado --user <owner> --output json --out-dir reportes`
+  - Calcular porcentajes con los campos `has_readme/has_license/has_codeowners/has_editorconfig/has_workflows/branch_name_ok/branch_protected`.
+- `python gh_manager.py mejorar --user <owner> --auto-topics --auto-description --dry-run`
+  - Verificar `topics_updated` y `description_set(dry)` en el output.
+- `python -m unittest -v`
+  - Verificar estabilidad del core.

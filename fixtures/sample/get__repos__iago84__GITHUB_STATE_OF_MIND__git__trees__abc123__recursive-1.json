@@ -1,0 +1,12 @@
+{
+  "tree": [
+    {"path": "gh_manager.py", "type": "blob"},
+    {"path": "gui.py", "type": "blob"},
+    {"path": "docs/index.html", "type": "blob"},
+    {"path": "k8s/deploy.yaml", "type": "blob"},
+    {"path": "Chart.yaml", "type": "blob"},
+    {"path": "main.tf", "type": "blob"},
+    {"path": "packages/app/package.json", "type": "blob"}
+  ]
+}
+
