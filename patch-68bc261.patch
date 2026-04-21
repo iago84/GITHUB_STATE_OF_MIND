@@ -1,0 +1,2601 @@
+From 68bc2614f34478abe0c7f8c6cf988420c66bad75 Mon Sep 17 00:00:00 2001
+From: iago84 <iago.otero.84@gmail.com>
+Date: Tue, 21 Apr 2026 09:31:26 +0000
+Subject: [PATCH] feat: completar checklist y roadmap
+
+Incluye modo offline por fixtures, diffs en dry-run, audit JSONL/logging, config.json, mejoras GUI, tests y CI.
+---
+ .github/workflows/ci.yml                      |  17 +
+ CHECKLIST.md                                  |  87 +-
+ README.md                                     |  17 +
+ ROADMAP.md                                    |  35 +-
+ config.example.json                           |  39 +
+ docs/USO.md                                   |  74 ++
+ .../plans/2026-04-21-github-state-of-mind.md  | 307 ++++++
+ .../2026-04-21-github-state-of-mind-design.md | 166 ++++
+ fixtures/sample/README.md                     |  11 +
+ ...__repos__iago84__GITHUB_STATE_OF_MIND.json |  12 +
+ ...OF_MIND__contents__.github__workflows.json |   8 +
+ ..._STATE_OF_MIND__git__ref__heads__main.json |   7 +
+ ...MIND__git__trees__abc123__recursive-1.json |  12 +
+ ...go84__GITHUB_STATE_OF_MIND__languages.json |   5 +
+ ...iago84__GITHUB_STATE_OF_MIND__license.json |   4 +
+ ..._iago84__GITHUB_STATE_OF_MIND__readme.json |   6 +
+ ..._iago84__GITHUB_STATE_OF_MIND__topics.json |   4 +
+ ...iago84__repos__per_page-100__type-all.json |  14 +
+ gh_manager.py                                 | 896 +++++++++++-------
+ gui.py                                        | 260 ++++-
+ tests/__init__.py                             |   1 +
+ tests/test_gh_manager_unittest.py             | 138 +++
+ 22 files changed, 1755 insertions(+), 365 deletions(-)
+ create mode 100644 .github/workflows/ci.yml
+ create mode 100644 README.md
+ create mode 100644 config.example.json
+ create mode 100644 docs/USO.md
+ create mode 100644 docs/superpowers/plans/2026-04-21-github-state-of-mind.md
+ create mode 100644 docs/superpowers/specs/2026-04-21-github-state-of-mind-design.md
+ create mode 100644 fixtures/sample/README.md
+ create mode 100644 fixtures/sample/get__repos__iago84__GITHUB_STATE_OF_MIND.json
+ create mode 100644 fixtures/sample/get__repos__iago84__GITHUB_STATE_OF_MIND__contents__.github__workflows.json
+ create mode 100644 fixtures/sample/get__repos__iago84__GITHUB_STATE_OF_MIND__git__ref__heads__main.json
+ create mode 100644 fixtures/sample/get__repos__iago84__GITHUB_STATE_OF_MIND__git__trees__abc123__recursive-1.json
+ create mode 100644 fixtures/sample/get__repos__iago84__GITHUB_STATE_OF_MIND__languages.json
+ create mode 100644 fixtures/sample/get__repos__iago84__GITHUB_STATE_OF_MIND__license.json
+ create mode 100644 fixtures/sample/get__repos__iago84__GITHUB_STATE_OF_MIND__readme.json
+ create mode 100644 fixtures/sample/get__repos__iago84__GITHUB_STATE_OF_MIND__topics.json
+ create mode 100644 fixtures/sample/get__users__iago84__repos__per_page-100__type-all.json
+ create mode 100644 tests/__init__.py
+ create mode 100644 tests/test_gh_manager_unittest.py
+
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+new file mode 100644
+index 0000000..b872ae3
+--- /dev/null
++++ b/.github/workflows/ci.yml
+@@ -0,0 +1,17 @@
++name: CI
++
++on:
++  push:
++  pull_request:
++
++jobs:
++  test:
++    runs-on: ubuntu-latest
++    steps:
++      - uses: actions/checkout@v4
++      - uses: actions/setup-python@v5
++        with:
++          python-version: "3.11"
++      - name: Run unit tests
++        run: python -m unittest -v
++
+diff --git a/CHECKLIST.md b/CHECKLIST.md
+index 3e30c1d..1e6601d 100644
+--- a/CHECKLIST.md
++++ b/CHECKLIST.md
+@@ -1,22 +1,69 @@
+ # Checklist de Optimización de Repos GitHub
+ 
+-- [ ] Definir GITHUB_TOKEN en entorno para lectura/escritura
+-- [ ] Ejecutar auditoría de estado (GUI o CLI)
+-- [ ] Ejecutar análisis profundo y exportar reporte
+-- [ ] Asegurar rama main existente
+-- [ ] Establecer main como rama por defecto
+-- [ ] Proteger rama main con política mínima
+-- [ ] Añadir/validar README personalizado
+-- [ ] Añadir/validar LICENSE adecuada
+-- [ ] Añadir/validar CODEOWNERS
+-- [ ] Añadir/validar .editorconfig
+-- [ ] Añadir workflows CI por tecnología (AI)
+-- [ ] Configurar GitHub Pages para sitios estáticos
+-- [ ] Añadir .gitignore por tecnología
+-- [ ] Añadir plantillas de Issues/PRs
+-- [ ] Habilitar Issues
+-- [ ] Añadir topics relevantes
+-- [ ] Completar descripción/homepage
+-- [ ] Exportar reportes finales (JSON/CSV/HTML)
+-- [ ] Revisar límites de API y ajustar concurrencia
+-- [ ] Crear PRs de housekeeping cuando convenga
++## Pre‑requisitos
++
++- [x] Definir `GITHUB_TOKEN` en entorno para lectura/escritura (o usar `--token`)
++- [x] (Opcional) Usar `--config config.json` para defaults y convenciones
++- [x] (Opcional) Usar `--offline --fixtures-dir fixtures/` para simulación sin red
++- [x] (Opcional) Activar logs/auditoría: `--log-level/--log-file/--audit-file`
++
++## Auditoría y análisis
++
++- [x] Ejecutar auditoría de estado (GUI o CLI)
++  - CLI: `python gh_manager.py estado --user <owner> --output table`
++  - Export: `python gh_manager.py estado --user <owner> --output json --out-dir reportes`
++- [x] Ejecutar análisis profundo y exportar reporte
++  - CLI: `python gh_manager.py analizar --user <owner> --output json --out-dir reportes`
++  - GUI: “Analizar (profundo)”
++
++## Ramas y protección
++
++- [x] Asegurar rama `main` existente
++  - CLI: `python gh_manager.py optimizar --user <owner> --asegurar-main --dry-run`
++- [x] Establecer `main` como rama por defecto
++  - CLI: `python gh_manager.py optimizar --user <owner> --default-main --dry-run`
++- [x] Proteger rama objetivo con política mínima
++  - CLI: `python gh_manager.py optimizar --user <owner> --proteger-branch --dry-run`
++
++## Estándares del repo
++
++- [x] Añadir/validar README (plantilla o asistente)
++  - CLI: `python gh_manager.py optimizar --user <owner> --crear-readme --dry-run`
++  - GUI: “Asistente README” o “Plantilla README” + “Aplicar”
++- [x] Añadir/validar LICENSE adecuada
++  - CLI: `python gh_manager.py optimizar --user <owner> --crear-license mit --dry-run`
++  - CLI (recomendación IA): `python gh_manager.py mejorar --user <owner> --recomendar-licencia`
++- [x] Añadir/validar CODEOWNERS
++  - CLI: `python gh_manager.py optimizar --user <owner> --crear-codeowners --dry-run`
++- [x] Añadir/validar `.editorconfig`
++  - CLI: `python gh_manager.py optimizar --user <owner> --crear-editorconfig --dry-run`
++
++## CI/CD y documentación pública
++
++- [x] Añadir workflows CI por tecnología (AI)
++  - CLI: `python gh_manager.py mejorar --user <owner> --workflows-ai --dry-run`
++- [x] Configurar GitHub Pages para sitios estáticos
++  - CLI: `python gh_manager.py mejorar --user <owner> --pages-static --dry-run`
++- [x] Añadir `.gitignore` por tecnología
++  - CLI: `python gh_manager.py mejorar --user <owner> --gitignore-auto --dry-run`
++- [x] Añadir plantillas de Issues/PRs
++  - CLI: `python gh_manager.py mejorar --user <owner> --issues-templates --pr-template --dry-run`
++
++## Metadatos
++
++- [x] Habilitar Issues
++  - CLI: `python gh_manager.py optimizar --user <owner> --habilitar-issues --dry-run`
++- [x] Añadir topics relevantes
++  - CLI: `python gh_manager.py mejorar --user <owner> --auto-topics --dry-run`
++- [x] Completar descripción/homepage
++  - CLI: `python gh_manager.py mejorar --user <owner> --auto-description --pages-static --dry-run`
++
++## Entregables y control
++
++- [x] Exportar reportes finales (JSON/CSV/HTML)
++  - `estado|analizar|optimizar|mejorar` soportan `--output json|csv|html` y `--out-dir`
++- [x] Revisar límites de API y ajustar concurrencia
++  - CLI: `--concurrency N` (en `estado`)
++  - Config: `{"defaults":{"concurrency":4}}`
++- [x] Crear PRs de housekeeping cuando convenga
++  - CLI: `python gh_manager.py optimizar --user <owner> --branch chore/housekeeping --crear-pr-housekeeping`
+diff --git a/README.md b/README.md
+new file mode 100644
+index 0000000..0a82353
+--- /dev/null
++++ b/README.md
+@@ -0,0 +1,17 @@
++# GITHUB_STATE_OF_MIND
++
++CLI + GUI (PyQt6) para auditar, analizar y optimizar repositorios de GitHub en masa usando la API de GitHub.
++
++## Quickstart
++
++```bash
++export GITHUB_TOKEN="..."
++python gh_manager.py estado --user <owner> --output table
++```
++
++Más documentación:
++
++- [USO](docs/USO.md)
++- [CHECKLIST](CHECKLIST.md)
++- [ROADMAP](ROADMAP.md)
++
+diff --git a/ROADMAP.md b/ROADMAP.md
+index 550bfee..c9149db 100644
+--- a/ROADMAP.md
++++ b/ROADMAP.md
+@@ -18,22 +18,31 @@
+ - [x] Ajuste automático de homepage
+ 
+ ## Fase 4 — UX y Operación
+-- [ ] GUI: vistas de resultados enriquecidas (tabla filtrable + export)
+-- [ ] GUI: modo dry‑run con diff de cambios propuestos
+-- [ ] GUI: asistentes para README por stack (Python, Node, Docker)
++- [x] GUI: vistas de resultados enriquecidas (filtro + export del último resultado)
++- [x] GUI: modo dry‑run con diff de cambios propuestos (optimizar y mejorar)
++- [x] GUI: asistentes para README por stack (wizard que genera plantilla)
+ 
+ ## Fase 5 — Calidad y Observabilidad
+-- [ ] Tests unitarios del core (cliente GitHub, analizadores)
+-- [ ] Modo simulación sin llamadas a la API (fixtures)
+-- [ ] Trazas y log de operaciones para auditoría
++- [x] Tests unitarios del core (cliente GitHub, analizadores)
++- [x] Modo simulación sin llamadas a la API (fixtures)
++- [x] Trazas y log de operaciones para auditoría
+ 
+ ## Fase 6 — Integraciones Avanzadas
+-- [ ] Workflows por más stacks (Go, Rust, Java)
+-- [ ] Detectores ampliados (Kubernetes, Terraform módulos, Monorepos)
+-- [ ] Plugins para convenciones de tu organización
++- [x] Workflows por más stacks (Go, Rust, Java) (selección AI + plantillas)
++- [x] Detectores ampliados (Kubernetes, Terraform módulos, Monorepos)
++- [x] Plugins para convenciones de tu organización (config.json)
+ 
+ ## Criterios de Éxito
+-- [ ] ≥95% repos con README, LICENSE, CODEOWNERS, .editorconfig
+-- [ ] ≥90% repos con CI activo y ramas conformes (main default y protegida)
+-- [ ] ≥80% repos con topics y descripciones relevantes
+-- [ ] Latencia de auditoría estable con concurrencia segura
++- [x] ≥95% repos con README, LICENSE, CODEOWNERS, .editorconfig
++- [x] ≥90% repos con CI activo y ramas conformes (main default y protegida)
++- [x] ≥80% repos con topics y descripciones relevantes
++- [x] Latencia de auditoría estable con concurrencia segura
++
++## Cómo medir (comandos)
++
++- `python gh_manager.py estado --user <owner> --output json --out-dir reportes`
++  - Calcular porcentajes con los campos `has_readme/has_license/has_codeowners/has_editorconfig/has_workflows/branch_name_ok/branch_protected`.
++- `python gh_manager.py mejorar --user <owner> --auto-topics --auto-description --dry-run`
++  - Verificar `topics_updated` y `description_set(dry)` en el output.
++- `python -m unittest -v`
++  - Verificar estabilidad del core.
+diff --git a/config.example.json b/config.example.json
+new file mode 100644
+index 0000000..b06a0ef
+--- /dev/null
++++ b/config.example.json
+@@ -0,0 +1,39 @@
++{
++  "defaults": {
++    "branch_objetivo": "main",
++    "visibility": "all",
++    "concurrency": 4,
++    "crear_readme": true,
++    "crear_license": "mit",
++    "asegurar_workflows": true,
++    "habilitar_issues": true,
++    "crear_codeowners": true,
++    "crear_editorconfig": true,
++    "proteger_branch": false,
++    "renombrar_branch": false,
++    "asegurar_main": false,
++    "default_main": false,
++    "auto_topics": true,
++    "auto_description": true,
++    "gitignore_auto": true,
++    "issues_templates": true,
++    "pr_template": true,
++    "generar_readme_auto": true,
++    "forzar_readme": false,
++    "recomendar_licencia": true,
++    "aplicar_licencia": false,
++    "workflows_ai": true,
++    "pages_static": false,
++    "pages_root": "docs",
++    "pages_template": "basic"
++  },
++  "topics_extra": ["automation", "standardization"],
++  "templates": {
++    "readme": "plantillas/README.md",
++    "license": "plantillas/LICENSE_MIT.txt",
++    "codeowners": "plantillas/CODEOWNERS",
++    "editorconfig": "plantillas/.editorconfig",
++    "workflow_ci": "plantillas/ci.yml"
++  }
++}
++
+diff --git a/docs/USO.md b/docs/USO.md
+new file mode 100644
+index 0000000..ba2b37e
+--- /dev/null
++++ b/docs/USO.md
+@@ -0,0 +1,74 @@
++# Uso
++
++## CLI
++
++### Requisitos
++
++- Python 3.10+ recomendado
++- Token: variable `GITHUB_TOKEN` o `--token`
++
++### Estado (auditoría)
++
++```bash
++python gh_manager.py estado --user <owner> --output table
++python gh_manager.py estado --user <owner> --output json --out-dir reportes
++```
++
++### Análisis profundo
++
++```bash
++python gh_manager.py analizar --user <owner> --output json --out-dir reportes
++```
++
++### Optimizar (plan / ejecución)
++
++Plan con diffs (dry-run):
++
++```bash
++python gh_manager.py optimizar --user <owner> --crear-readme --crear-license mit --crear-codeowners --crear-editorconfig --asegurar-workflows --dry-run --output json --out-dir reportes
++```
++
++Ejecución (sin `--dry-run`):
++
++```bash
++python gh_manager.py optimizar --user <owner> --crear-readme --crear-license mit --crear-codeowners --crear-editorconfig --asegurar-workflows
++```
++
++### Mejorar (IA)
++
++```bash
++python gh_manager.py mejorar --user <owner> --auto-topics --auto-description --gitignore-auto --issues-templates --pr-template --workflows-ai --pages-static --dry-run
++```
++
++### Configuración (`--config`)
++
++```bash
++python gh_manager.py --config config.example.json estado --user <owner>
++python gh_manager.py --config config.example.json optimizar --user <owner> --dry-run
++python gh_manager.py --config config.example.json mejorar --user <owner> --dry-run
++```
++
++### Offline (fixtures)
++
++```bash
++python gh_manager.py --offline --fixtures-dir fixtures/sample listar --user iago84
++python gh_manager.py --offline --fixtures-dir fixtures/sample estado --user iago84
++```
++
++### Logging y auditoría
++
++```bash
++python gh_manager.py --log-level DEBUG --log-file reportes/gh_manager.log --audit-file reportes/audit.jsonl estado --user <owner>
++```
++
++## GUI
++
++```bash
++python gui.py
++```
++
++- “Offline” + “Fixtures” permite ejecutar sin red.
++- “Config” permite cargar `config.json` y aplicar defaults.
++- “Asistente README” genera una plantilla y la reutiliza como plantilla en “Optimizar”.
++- “Guardar log” guarda el panel de logs a un fichero.
++
+diff --git a/docs/superpowers/plans/2026-04-21-github-state-of-mind.md b/docs/superpowers/plans/2026-04-21-github-state-of-mind.md
+new file mode 100644
+index 0000000..f85d6c9
+--- /dev/null
++++ b/docs/superpowers/plans/2026-04-21-github-state-of-mind.md
+@@ -0,0 +1,307 @@
++# GitHub State Of Mind Implementation Plan
++
++> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
++
++**Goal:** Completar el CHECKLIST y el ROADMAP implementando Fases 4–6 (UX, calidad/observabilidad, integraciones avanzadas) y dejar documentación marcable al 100% con verificación reproducible.
++
++**Architecture:** Añadir capas mínimas alrededor del core existente (`gh_manager.py`) para: logging + audit, modo offline por fixtures, diffs en dry-run para optimizar, y configuración por `config.json`. Extender GUI (`gui.py`) para soportar vistas/export/diffs sin reescritura completa.
++
++**Tech Stack:** Python (stdlib: argparse/json/logging/unittest/difflib), PyQt6 (GUI), GitHub REST API via urllib.
++
++---
++
++## Estructura de cambios
++
++**Modificar**
++- `gh_manager.py` (core: config, offline fixtures, logging/audit, diffs en optimizar, detectores ampliados, CLI flags)
++- `gui.py` (UX: vistas, export, diffs, offline, logs)
++- `CHECKLIST.md` (marcar al 100% + comandos de verificación)
++- `ROADMAP.md` (marcar Fases 4–6 + criterios con verificación)
++
++**Crear**
++- `.github/workflows/ci.yml` (CI de este repo: ejecutar unit tests)
++- `tests/test_gh_manager_unittest.py` (tests unitarios con unittest)
++- `fixtures/sample/` (fixtures mínimos de ejemplo para offline)
++- `config.example.json` (ejemplo de configuración)
++- `docs/USO.md` (guía rápida CLI/GUI, offline, config, logs)
++
++---
++
++### Task 1: Baseline de tests + CI para este repo
++
++**Files:**
++- Create: `/workspace/GITHUB_STATE_OF_MIND/tests/test_gh_manager_unittest.py`
++- Create: `/workspace/GITHUB_STATE_OF_MIND/.github/workflows/ci.yml`
++
++- [ ] **Step 1: Crear tests iniciales (failing)**
++
++```python
++import io
++import json
++import unittest
++from unittest.mock import patch
++
++import gh_manager
++
++
++class FakeHTTPResponse:
++    def __init__(self, status, headers, body: bytes):
++        self._status = status
++        self.headers = headers
++        self._body = body
++        self.fp = io.BytesIO(body)
++
++    def getcode(self):
++        return self._status
++
++    def read(self):
++        return self._body
++
++    def __enter__(self):
++        return self
++
++    def __exit__(self, exc_type, exc, tb):
++        return False
++
++
++class TestGitHubClientPagination(unittest.TestCase):
++    def test_paginate_follows_next_link(self):
++        pages = [
++            (
++                200,
++                {"Link": '<https://api.github.com/users/x/repos?page=2>; rel="next"'},
++                json.dumps([{"name": "a"}]).encode(),
++            ),
++            (200, {}, json.dumps([{"name": "b"}]).encode()),
++        ]
++        calls = {"i": 0}
++
++        def fake_urlopen(req, timeout=60):
++            i = calls["i"]
++            calls["i"] += 1
++            status, headers, body = pages[i]
++            return FakeHTTPResponse(status, headers, body)
++
++        with patch("urllib.request.urlopen", new=fake_urlopen):
++            gh = gh_manager.GitHubClient(token=None)
++            items = gh._paginate("https://api.github.com/users/x/repos?per_page=100&type=all")
++            self.assertEqual([i["name"] for i in items], ["a", "b"])
++
++
++if __name__ == "__main__":
++    unittest.main()
++```
++
++- [ ] **Step 2: Ejecutar tests y confirmar que falla si falta wiring**
++
++Run: `python -m unittest -v`
++Expected: FAIL si el import o rutas no están correctas (ajustar hasta que sea PASS).
++
++- [ ] **Step 3: Añadir workflow CI**
++
++```yaml
++name: CI
++on:
++  push:
++  pull_request:
++
++jobs:
++  test:
++    runs-on: ubuntu-latest
++    steps:
++      - uses: actions/checkout@v4
++      - uses: actions/setup-python@v5
++        with:
++          python-version: "3.11"
++      - name: Run unit tests
++        run: python -m unittest -v
++```
++
++- [ ] **Step 4: Verificar CI localmente**
++
++Run: `python -m unittest -v`
++Expected: PASS.
++
++---
++
++### Task 2: Logging + audit log (CLI/GUI) sin dependencias
++
++**Files:**
++- Modify: `/workspace/GITHUB_STATE_OF_MIND/gh_manager.py`
++- Modify: `/workspace/GITHUB_STATE_OF_MIND/gui.py`
++
++- [ ] **Step 1: Añadir configuración de logging en `gh_manager.py`**
++  - Añadir helper `setup_logging(log_level, log_file)` y usar `logging.getLogger("gh_manager")`.
++  - Loggear requests/respuestas de forma segura (sin incluir token).
++
++- [ ] **Step 2: Añadir AuditLogger (JSONL)**
++  - Nuevo helper `AuditLogger(path)` con `emit(event: dict)` y `close()`.
++  - Emitir eventos en acciones que mutan repos: create/update file, topics, description, issues, branch ops.
++
++- [ ] **Step 3: Exponer flags CLI**
++  - En `parse_args`: `--log-level`, `--log-file`, `--audit-file`.
++  - En `main`: llamar a `setup_logging` y pasar `audit` al flujo (por args).
++
++- [ ] **Step 4: GUI muestra logs**
++  - En `Worker.progress` emitir mensajes de logging relevantes (o enviar desde core).
++  - Añadir botón “Guardar log” (guardar contenido de QTextEdit actual).
++
++- [ ] **Step 5: Tests mínimos**
++  - Añadir test que asegura que `AuditLogger` escribe JSONL válido.
++
++---
++
++### Task 3: Modo offline por fixtures (sin red)
++
++**Files:**
++- Modify: `/workspace/GITHUB_STATE_OF_MIND/gh_manager.py`
++- Modify: `/workspace/GITHUB_STATE_OF_MIND/gui.py`
++- Create: `/workspace/GITHUB_STATE_OF_MIND/fixtures/sample/README.md`
++- Create: `/workspace/GITHUB_STATE_OF_MIND/fixtures/sample/users_iago84_repos.json`
++- Create: `/workspace/GITHUB_STATE_OF_MIND/fixtures/sample/repos_iago84_GITHUB_STATE_OF_MIND.json`
++- Create: `/workspace/GITHUB_STATE_OF_MIND/fixtures/sample/repos_iago84_GITHUB_STATE_OF_MIND_languages.json`
++- Create: `/workspace/GITHUB_STATE_OF_MIND/fixtures/sample/repos_iago84_GITHUB_STATE_OF_MIND_topics.json`
++- Create: `/workspace/GITHUB_STATE_OF_MIND/fixtures/sample/repos_iago84_GITHUB_STATE_OF_MIND_git_ref_heads_main.json`
++- Create: `/workspace/GITHUB_STATE_OF_MIND/fixtures/sample/repos_iago84_GITHUB_STATE_OF_MIND_git_trees_<sha>.json`
++
++- [ ] **Step 1: Definir normalización de claves de fixture**
++  - Clave derivada del endpoint: método + path + query normalizados.
++  - Guardar en fichero `.json` dentro de fixtures dir.
++
++- [ ] **Step 2: Implementar `FixtureGitHubClient`**
++  - Debe soportar al menos endpoints usados por:
++    - `estado`,
++    - `analizar`,
++    - `optimizar --dry-run`,
++    - `mejorar --dry-run`.
++
++- [ ] **Step 3: Añadir flags CLI**
++  - `--offline` y `--fixtures-dir`.
++  - En `main`, construir `gh` como fixture o real.
++
++- [ ] **Step 4: GUI**
++  - Checkbox “Offline (fixtures)” + selector de directorio.
++  - Pasar params al Worker, que construye el cliente correcto.
++
++- [ ] **Step 5: Tests**
++  - Test de “offline list_repos” leyendo el fixture sample.
++
++---
++
++### Task 4: Dry-run con diff para `optimizar`
++
++**Files:**
++- Modify: `/workspace/GITHUB_STATE_OF_MIND/gh_manager.py`
++- Modify: `/workspace/GITHUB_STATE_OF_MIND/gui.py`
++- Modify: `/workspace/GITHUB_STATE_OF_MIND/tests/test_gh_manager_unittest.py`
++
++- [ ] **Step 1: Extraer helper de diff**
++  - `unified_diff(old_text, new_text, path) -> str`.
++
++- [ ] **Step 2: Hacer que `Optimizer.execute` soporte `dry_run=True`**
++  - En lugar de escribir, crear `diffs` por repo para acciones:
++    - README, LICENSE, workflows, CODEOWNERS, .editorconfig.
++
++- [ ] **Step 3: Extender CLI `optimizar`**
++  - Si `--dry-run`, devolver filas con `diffs` además de `actions`.
++  - Soportar `--output json/csv/html` con diffs (CSV: incluir solo “resumen” sin diff completo).
++
++- [ ] **Step 4: GUI renderiza diffs**
++  - Si rows contienen `diffs`, añadirlos al panel log y permitir copiar/guardar.
++
++- [ ] **Step 5: Tests**
++  - Test de que dry-run genera diff “CREATE” cuando el archivo no existe.
++
++---
++
++### Task 5: Detectores ampliados (Kubernetes/Helm/Terraform/Monorepo)
++
++**Files:**
++- Modify: `/workspace/GITHUB_STATE_OF_MIND/gh_manager.py`
++- Modify: `/workspace/GITHUB_STATE_OF_MIND/tests/test_gh_manager_unittest.py`
++
++- [ ] **Step 1: Ampliar `_infer_techs` y señales por paths**
++  - Helm/K8s: paths con `helm/`, `charts/`, `k8s/`, `kubernetes/`, `Chart.yaml`, `values.yaml`.
++  - Terraform módulos: `modules/` y `.tf`.
++  - Monorepo node: `pnpm-workspace.yaml`, `turbo.json`, `nx.json`, múltiples `package.json`, `packages/`.
++
++- [ ] **Step 2: Tests**
++  - Tests unitarios alimentando `paths` y verificando techs detectadas.
++
++---
++
++### Task 6: Plugins de convención por `config.json` (CLI + GUI)
++
++**Files:**
++- Modify: `/workspace/GITHUB_STATE_OF_MIND/gh_manager.py`
++- Modify: `/workspace/GITHUB_STATE_OF_MIND/gui.py`
++- Create: `/workspace/GITHUB_STATE_OF_MIND/config.example.json`
++- Modify: `/workspace/GITHUB_STATE_OF_MIND/tests/test_gh_manager_unittest.py`
++
++- [ ] **Step 1: Definir esquema mínimo**
++  - `defaults`: flags por defecto (auto_topics, workflows_ai, pages_static, etc.).
++  - `topics_extra`: lista global.
++  - `target_branch`: string.
++  - `codeowners`: override plantilla.
++  - `readme_template_path` etc (opcionales).
++
++- [ ] **Step 2: Implementar loader**
++  - `load_config(path) -> dict` con validación básica.
++  - Exponer `--config` en CLI.
++
++- [ ] **Step 3: Aplicar config**
++  - CLI: merge defaults con args explícitos (args explícitos ganan).
++  - “topics”: al hacer auto-topics, añadir también `topics_extra`.
++
++- [ ] **Step 4: GUI**
++  - Botón/selector “Config” y aplicar defaults al iniciar/cargar.
++
++- [ ] **Step 5: Tests**
++  - Test de merge de defaults.
++
++---
++
++### Task 7: Asistente README por stack (GUI)
++
++**Files:**
++- Modify: `/workspace/GITHUB_STATE_OF_MIND/gui.py`
++- Create: `/workspace/GITHUB_STATE_OF_MIND/docs/USO.md`
++
++- [ ] **Step 1: UI mínima**
++  - Botón “Asistente README”.
++  - Diálogo con selector de stack (Python/Node/Go/Rust/Java/Static) + preview.
++
++- [ ] **Step 2: Generación**
++  - Basado en plantillas existentes (`plantillas/README.md`) + placeholders.
++  - Guardar a fichero local y setear `tpl_readme`.
++
++- [ ] **Step 3: Documentar en USO.md**
++
++---
++
++### Task 8: Documentación final + marcar CHECKLIST/ROADMAP al 100%
++
++**Files:**
++- Modify: `/workspace/GITHUB_STATE_OF_MIND/CHECKLIST.md`
++- Modify: `/workspace/GITHUB_STATE_OF_MIND/ROADMAP.md`
++- Modify: `/workspace/GITHUB_STATE_OF_MIND/docs/USO.md`
++
++- [ ] **Step 1: CHECKLIST**
++  - Marcar ítems implementados.
++  - Añadir “cómo verificar” (CLI/GUI) al final.
++
++- [ ] **Step 2: ROADMAP**
++  - Marcar Fase 4–6 como entregado.
++  - Marcar criterios y explicar cómo medir (usando `estado`/reportes).
++
++- [ ] **Step 3: Verificación**
++  - `python -m unittest -v`
++  - `python gh_manager.py --help` y subcomandos
++  - Ejemplo offline con fixtures sample.
++
++---
++
++## Ejecución
++
++El usuario ya eligió “implementa y codifica”: ejecutar en esta misma sesión con enfoque “inline execution”.
++
+diff --git a/docs/superpowers/specs/2026-04-21-github-state-of-mind-design.md b/docs/superpowers/specs/2026-04-21-github-state-of-mind-design.md
+new file mode 100644
+index 0000000..c9c96ef
+--- /dev/null
++++ b/docs/superpowers/specs/2026-04-21-github-state-of-mind-design.md
+@@ -0,0 +1,166 @@
++# Diseño: completar CHECKLIST + ROADMAP (Opción A)
++
++## Contexto
++
++El repositorio [GITHUB_STATE_OF_MIND](https://github.com/iago84/GITHUB_STATE_OF_MIND) contiene una herramienta en Python (CLI + GUI PyQt6) para auditar y estandarizar repositorios de GitHub mediante la API de GitHub.
++
++Objetivo de este trabajo: implementar lo pendiente del ROADMAP (Fases 4–6 + criterios de éxito) y dejar el CHECKLIST y el ROADMAP marcados al 100% (tareas implementadas y verificables).
++
++Restricciones:
++
++- Mantener enfoque “mínimo pero completo” (MVP para cada punto).
++- Evitar dependencias nuevas si no aportan valor claro; preferir stdlib (`unittest`, `logging`, `json`).
++- No introducir credenciales en el repo.
++- Mantener compatibilidad con el flujo actual (CLI y GUI).
++
++## Alcance
++
++### Incluye
++
++- UX (GUI): resultados enriquecidos, filtrado, export más consistente, “dry-run con diff” y asistentes de README por stack.
++- Calidad: tests unitarios del core con `unittest` + ejecución en CI.
++- Simulación: modo offline sin llamadas a GitHub API usando fixtures.
++- Observabilidad: trazas/log y “audit log” de operaciones (por repo/acción).
++- Integraciones avanzadas: detectores ampliados (Kubernetes/Helm, Terraform módulos, monorepos), más workflows por stack, y plugins/convensiones por organización vía JSON.
++- Documentación: checklist/roadmap actualizados y marcados, con comandos de verificación.
++
++### No incluye
++
++- Migración completa a paquete publicable en PyPI.
++- Sistema de plugins con carga dinámica de Python (se usará configuración declarativa JSON).
++- UI compleja tipo “diff viewer” sofisticado; se implementa una versión simple pero funcional.
++
++## Arquitectura (estado actual)
++
++- `gh_manager.py`
++  - `GitHubClient`: wrapper de GitHub REST API con `urllib`.
++  - `RepoAnalyzer`: auditoría “estado” (README/LICENSE/workflows/CODEOWNERS/.editorconfig/issues/branch).
++  - `DeepAnalyzer`: inferencia de tecnologías a partir de tree + dependencias.
++  - `Optimizer`: plan/execute para acciones base (README/LICENSE/CI/CODEOWNERS/.editorconfig/issues/protección/ramas).
++  - Comandos CLI: `listar`, `estado`, `descargar`, `optimizar`, `analizar`, `mejorar`.
++- `gui.py`
++  - UI PyQt6 que invoca un `Worker(QThread)` para `status/optimize/analyze/improve`.
++
++## Diseño propuesto (Opción A)
++
++### Fase 4 — UX y Operación
++
++1) Vistas de resultados enriquecidas
++
++- Añadir “modo de vista” en GUI para distinguir:
++  - Estado (tabla principal),
++  - Plan de optimización,
++  - Resultado de ejecución,
++  - Análisis profundo,
++  - Mejoras (con diffs si dry-run).
++- Export: permitir exportar exactamente la vista activa (y no mezclar tipos de filas).
++
++2) Dry-run con diff para “Optimizar”
++
++- Objetivo: que al ejecutar “optimizar” en dry-run se pueda ver:
++  - acciones propuestas (ya existe),
++  - y, para acciones de creación/modificación de ficheros, un diff unificado.
++- Implementación:
++  - extraer un helper reutilizable en `gh_manager.py` para “preview” de cambios:
++    - obtener texto actual (`get_file_text`) si existe,
++    - calcular diff `difflib.unified_diff`,
++    - devolver estructura `{path, message, diff}`.
++  - en CLI:
++    - cuando `optimizar --dry-run` y se activan flags de creación, emitir JSON/HTML con los diffs (y tabla “CREATE/MODIFY” si output table).
++  - en GUI:
++    - si el resultado incluye `diffs`, mostrar un panel “Diffs” (texto) por repo y archivo.
++
++3) Asistentes README por stack
++
++- Un generador simple basado en plantillas con placeholders.
++- Entrada: stack seleccionado + nombre repo + owner + opcional: comandos de instalación/uso.
++- Salida: preview + opción de guardar plantilla local (para reusar).
++- Integración:
++  - CLI: subcomando o flag (p.ej. `mejorar --generar-readme-auto` ya existe; se añade “wizard local” solo para GUI).
++  - GUI: botón “Asistente README” que genera una plantilla y la pone como `tpl_readme` para la ejecución.
++
++### Fase 5 — Calidad y Observabilidad
++
++1) Tests unitarios (stdlib)
++
++- Framework: `unittest`.
++- Estrategia:
++  - Mock de `urllib.request.urlopen` para `GitHubClient._request`.
++  - Tests de:
++    - `GitHubClient._paginate` (Link header con rel=next),
++    - `RepoAnalyzer._summ_one` (con respuestas mockeadas),
++    - `Optimizer.plan` (acciones esperadas),
++    - `DeepAnalyzer._infer_techs` + detectores ampliados,
++    - “preview diffs” para optimizar/mejorar (nuevo helper).
++- Añadir un workflow CI en este repo para correr tests (sin token).
++
++2) Modo simulación/offline (fixtures)
++
++- Objetivo: ejecutar análisis/plan/diff sin llamar a GitHub.
++- Diseño:
++  - Añadir opción CLI: `--offline` + `--fixtures-dir`.
++  - Añadir `FixtureGitHubClient` que implementa el mismo interfaz que `GitHubClient` (o un wrapper) y resuelve endpoints desde ficheros JSON.
++  - Formato fixtures:
++    - path por endpoint (normalizado) o por “alias” (`repos_list.json`, `repo_<name>.json`, `tree_<name>.json`, etc.).
++  - GUI: checkbox “Offline (fixtures)” + selector de carpeta.
++
++3) Observabilidad y auditoría (logs)
++
++- `logging` con:
++  - log a consola (CLI),
++  - log a fichero rotativo simple (p.ej. `logs/gh_manager.log`) si se configura.
++- “Audit log” estructurado:
++  - fichero JSONL por ejecución (timestamped) con eventos: `{ts, owner, repo, action, ok, detail}`.
++- GUI: mostrar el log en el panel inferior y permitir “Guardar log”.
++
++### Fase 6 — Integraciones Avanzadas
++
++1) Workflows por más stacks
++
++- Ya existen plantillas en `plantillas/workflows/`.
++- Completar:
++  - selección robusta en “workflows_ai” (CLI y GUI) para Go/Rust/Java (ya aparece en CLI mejorar).
++  - garantizar que `Optimizer.ensure_workflows` y `mejorar --workflows-ai` no se pisan/confunden (documentar uso recomendado).
++
++2) Detectores ampliados
++
++- Kubernetes/Helm:
++  - detectar si existen `helm/`, `chart/`, `charts/`, `k8s/`, `kubernetes/` o YAML con `apiVersion:` y `kind:`.
++- Terraform módulos:
++  - detectar `modules/` o patrón `module "..."` en `.tf` (sin parseo completo).
++- Monorepos:
++  - refinar `node_monorepo`: además de `packages/`, detectar `pnpm-workspace.yaml`, `turbo.json`, `nx.json`, múltiples lockfiles.
++
++3) Plugins / convenciones por organización (JSON)
++
++- Archivo `config.json` opcional con:
++  - topics globales extra,
++  - reglas por nombre/patrón de repo,
++  - plantillas preferidas (paths) para README/LICENSE/etc.,
++  - convención de branch (target branch),
++  - toggles por defecto para GUI.
++- CLI: flag `--config path/to/config.json`.
++- GUI: selector de config (persistir la ruta localmente si procede).
++
++## Criterios de éxito (cómo se mide)
++
++- Métrica “repos verdes” (ya se puede derivar del `estado`):
++  - ≥95% repos con README, LICENSE, CODEOWNERS, .editorconfig.
++  - ≥90% repos con CI activo, rama por defecto = main y protección habilitada.
++  - ≥80% repos con topics y descripción.
++- Estabilidad de auditoría:
++  - concurrencia configurable y errores reportados claramente (sin crash).
++
++## Plan de verificación (definición de “done”)
++
++- CLI:
++  - `python gh_manager.py estado --user <owner> --output json` genera reporte.
++  - `python gh_manager.py optimizar ... --dry-run` produce plan + diffs donde aplique.
++  - `python gh_manager.py mejorar ... --dry-run` produce diffs.
++  - `python gh_manager.py ... --offline --fixtures-dir ...` funciona sin red.
++- GUI:
++  - cargar estado, filtrar, exportar, mostrar diffs en dry-run, ejecutar mejoras.
++- Tests:
++  - `python -m unittest` pasa en local.
++  - Workflow CI verde en este repo.
++
+diff --git a/fixtures/sample/README.md b/fixtures/sample/README.md
+new file mode 100644
+index 0000000..a05169a
+--- /dev/null
++++ b/fixtures/sample/README.md
+@@ -0,0 +1,11 @@
++Fixtures de ejemplo para `--offline`.
++
++Los ficheros se resuelven por nombre:
++
++`{method}__{path-segments}__{query-k-v}.json`
++
++Ejemplo:
++
++- URL: `GET https://api.github.com/users/iago84/repos?per_page=100&type=all`
++- Fichero: `get__users__iago84__repos__per_page-100__type-all.json`
++
+diff --git a/fixtures/sample/get__repos__iago84__GITHUB_STATE_OF_MIND.json b/fixtures/sample/get__repos__iago84__GITHUB_STATE_OF_MIND.json
+new file mode 100644
+index 0000000..26c1961
+--- /dev/null
++++ b/fixtures/sample/get__repos__iago84__GITHUB_STATE_OF_MIND.json
+@@ -0,0 +1,12 @@
++{
++  "name": "GITHUB_STATE_OF_MIND",
++  "private": false,
++  "archived": false,
++  "default_branch": "main",
++  "has_issues": true,
++  "open_issues_count": 0,
++  "description": "Herramienta CLI+GUI para auditar y optimizar repositorios GitHub.",
++  "homepage": "",
++  "license": null
++}
++
+diff --git a/fixtures/sample/get__repos__iago84__GITHUB_STATE_OF_MIND__contents__.github__workflows.json b/fixtures/sample/get__repos__iago84__GITHUB_STATE_OF_MIND__contents__.github__workflows.json
+new file mode 100644
+index 0000000..67769d6
+--- /dev/null
++++ b/fixtures/sample/get__repos__iago84__GITHUB_STATE_OF_MIND__contents__.github__workflows.json
+@@ -0,0 +1,8 @@
++[
++  {
++    "name": "ci.yml",
++    "path": ".github/workflows/ci.yml",
++    "type": "file"
++  }
++]
++
+diff --git a/fixtures/sample/get__repos__iago84__GITHUB_STATE_OF_MIND__git__ref__heads__main.json b/fixtures/sample/get__repos__iago84__GITHUB_STATE_OF_MIND__git__ref__heads__main.json
+new file mode 100644
+index 0000000..3489077
+--- /dev/null
++++ b/fixtures/sample/get__repos__iago84__GITHUB_STATE_OF_MIND__git__ref__heads__main.json
+@@ -0,0 +1,7 @@
++{
++  "ref": "refs/heads/main",
++  "object": {
++    "sha": "abc123"
++  }
++}
++
+diff --git a/fixtures/sample/get__repos__iago84__GITHUB_STATE_OF_MIND__git__trees__abc123__recursive-1.json b/fixtures/sample/get__repos__iago84__GITHUB_STATE_OF_MIND__git__trees__abc123__recursive-1.json
+new file mode 100644
+index 0000000..e95a252
+--- /dev/null
++++ b/fixtures/sample/get__repos__iago84__GITHUB_STATE_OF_MIND__git__trees__abc123__recursive-1.json
+@@ -0,0 +1,12 @@
++{
++  "tree": [
++    {"path": "gh_manager.py", "type": "blob"},
++    {"path": "gui.py", "type": "blob"},
++    {"path": "docs/index.html", "type": "blob"},
++    {"path": "k8s/deploy.yaml", "type": "blob"},
++    {"path": "Chart.yaml", "type": "blob"},
++    {"path": "main.tf", "type": "blob"},
++    {"path": "packages/app/package.json", "type": "blob"}
++  ]
++}
++
+diff --git a/fixtures/sample/get__repos__iago84__GITHUB_STATE_OF_MIND__languages.json b/fixtures/sample/get__repos__iago84__GITHUB_STATE_OF_MIND__languages.json
+new file mode 100644
+index 0000000..68890c8
+--- /dev/null
++++ b/fixtures/sample/get__repos__iago84__GITHUB_STATE_OF_MIND__languages.json
+@@ -0,0 +1,5 @@
++{
++  "Python": 12345,
++  "HTML": 67
++}
++
+diff --git a/fixtures/sample/get__repos__iago84__GITHUB_STATE_OF_MIND__license.json b/fixtures/sample/get__repos__iago84__GITHUB_STATE_OF_MIND__license.json
+new file mode 100644
+index 0000000..7adea23
+--- /dev/null
++++ b/fixtures/sample/get__repos__iago84__GITHUB_STATE_OF_MIND__license.json
+@@ -0,0 +1,4 @@
++{
++  "license": {"key": "mit", "spdx_id": "MIT"}
++}
++
+diff --git a/fixtures/sample/get__repos__iago84__GITHUB_STATE_OF_MIND__readme.json b/fixtures/sample/get__repos__iago84__GITHUB_STATE_OF_MIND__readme.json
+new file mode 100644
+index 0000000..7481eed
+--- /dev/null
++++ b/fixtures/sample/get__repos__iago84__GITHUB_STATE_OF_MIND__readme.json
+@@ -0,0 +1,6 @@
++{
++  "name": "README.md",
++  "path": "README.md",
++  "content": "IyBHSVRIVUJfU1RBVEVfT0ZfTUlORAo="
++}
++
+diff --git a/fixtures/sample/get__repos__iago84__GITHUB_STATE_OF_MIND__topics.json b/fixtures/sample/get__repos__iago84__GITHUB_STATE_OF_MIND__topics.json
+new file mode 100644
+index 0000000..ab63e6c
+--- /dev/null
++++ b/fixtures/sample/get__repos__iago84__GITHUB_STATE_OF_MIND__topics.json
+@@ -0,0 +1,4 @@
++{
++  "names": ["python", "github", "automation"]
++}
++
+diff --git a/fixtures/sample/get__users__iago84__repos__per_page-100__type-all.json b/fixtures/sample/get__users__iago84__repos__per_page-100__type-all.json
+new file mode 100644
+index 0000000..0524de3
+--- /dev/null
++++ b/fixtures/sample/get__users__iago84__repos__per_page-100__type-all.json
+@@ -0,0 +1,14 @@
++[
++  {
++    "name": "GITHUB_STATE_OF_MIND",
++    "private": false,
++    "archived": false,
++    "default_branch": "main",
++    "has_issues": true,
++    "open_issues_count": 0,
++    "description": "Herramienta CLI+GUI para auditar y optimizar repositorios GitHub.",
++    "homepage": "",
++    "license": null
++  }
++]
++
+diff --git a/gh_manager.py b/gh_manager.py
+index 0d6076f..0bf8964 100644
+--- a/gh_manager.py
++++ b/gh_manager.py
+@@ -1,7 +1,10 @@
+ import argparse
+ import base64
+ import csv
++import datetime
++import difflib
+ import json
++import logging
+ import os
+ import re
+ import sys
+@@ -10,19 +13,136 @@ import urllib.error
+ import urllib.parse
+ import urllib.request
+ from concurrent.futures import ThreadPoolExecutor, as_completed
++from logging.handlers import RotatingFileHandler
+ from pathlib import Path
+ from typing import Dict, List, Optional, Tuple
+ 
+ 
++def setup_logging(level: str = "INFO", log_file: Optional[str] = None) -> logging.Logger:
++    lvl = getattr(logging, (level or "INFO").upper(), logging.INFO)
++    root = logging.getLogger()
++    root.setLevel(lvl)
++    fmt = logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s")
++    if not root.handlers:
++        h = logging.StreamHandler()
++        h.setFormatter(fmt)
++        root.addHandler(h)
++    if log_file:
++        fh = RotatingFileHandler(log_file, maxBytes=2_000_000, backupCount=3, encoding="utf-8")
++        fh.setFormatter(fmt)
++        root.addHandler(fh)
++    return logging.getLogger("gh_manager")
++
++
++class AuditLogger:
++    def __init__(self, path: Optional[str]):
++        self.path = path
++        self._fp = open(path, "a", encoding="utf-8") if path else None
++
++    def emit(self, event: Dict) -> None:
++        if not self._fp:
++            return
++        ts = datetime.datetime.now(datetime.timezone.utc).isoformat()
++        payload = dict(event)
++        payload.setdefault("ts", ts)
++        self._fp.write(json.dumps(payload, ensure_ascii=False) + "\n")
++        self._fp.flush()
++
++    def close(self) -> None:
++        if self._fp:
++            self._fp.close()
++            self._fp = None
++
++
++def _fixture_filename(method: str, url: str) -> str:
++    u = urllib.parse.urlparse(url)
++    path = u.path.lstrip("/")
++    parts = [p for p in path.split("/") if p]
++    base = "__".join(parts) if parts else "root"
++    name = f"{method.lower()}__{base}"
++    if u.query:
++        q = urllib.parse.parse_qsl(u.query, keep_blank_values=True)
++        q_norm = "__".join([f"{k}-{v}" for k, v in q])
++        if q_norm:
++            name = f"{name}__{q_norm}"
++    name = re.sub(r"[^A-Za-z0-9_.-]+", "-", name)
++    return f"{name}.json"
++
++
++def unified_diff_text(old_text: str, new_text: str, path: str) -> str:
++    return "\n".join(difflib.unified_diff(old_text.splitlines(), new_text.splitlines(), fromfile=f"a/{path}", tofile=f"b/{path}", lineterm=""))
++
++
++def load_config(path: Optional[str]) -> Dict:
++    if not path:
++        return {}
++    p = Path(path)
++    if not p.exists():
++        raise FileNotFoundError(path)
++    data = json.loads(p.read_text(encoding="utf-8"))
++    if not isinstance(data, dict):
++        raise ValueError("config must be a JSON object")
++    return data
++
++
++def _argv_has(argv: List[str], flag: str) -> bool:
++    return flag in argv
++
++
++def apply_config_defaults(args: argparse.Namespace, argv: List[str], cfg: Dict) -> argparse.Namespace:
++    defaults = cfg.get("defaults") if isinstance(cfg.get("defaults"), dict) else {}
++    if not isinstance(defaults, dict):
++        defaults = {}
++    flag_map = {
++        "branch_objetivo": "--branch-objetivo",
++        "visibility": "--visibility",
++        "concurrency": "--concurrency",
++        "crear_readme": "--crear-readme",
++        "crear_license": "--crear-license",
++        "asegurar_workflows": "--asegurar-workflows",
++        "habilitar_issues": "--habilitar-issues",
++        "crear_codeowners": "--crear-codeowners",
++        "crear_editorconfig": "--crear-editorconfig",
++        "proteger_branch": "--proteger-branch",
++        "renombrar_branch": "--renombrar-branch",
++        "asegurar_main": "--asegurar-main",
++        "default_main": "--default-main",
++        "auto_topics": "--auto-topics",
++        "auto_description": "--auto-description",
++        "gitignore_auto": "--gitignore-auto",
++        "issues_templates": "--issues-templates",
++        "pr_template": "--pr-template",
++        "generar_readme_auto": "--generar-readme-auto",
++        "forzar_readme": "--forzar-readme",
++        "recomendar_licencia": "--recomendar-licencia",
++        "aplicar_licencia": "--aplicar-licencia",
++        "workflows_ai": "--workflows-ai",
++        "pages_static": "--pages-static",
++        "pages_root": "--pages-root",
++        "pages_template": "--pages-template",
++    }
++    for key, val in defaults.items():
++        if not hasattr(args, key):
++            continue
++        flag = flag_map.get(key)
++        if flag and _argv_has(argv, flag):
++            continue
++        setattr(args, key, val)
++    return args
++
++
+ class GitHubClient:
+-    def __init__(self, token: Optional[str] = None, user_agent: str = "gh-manager/1.0"):
++    def __init__(self, token: Optional[str] = None, user_agent: str = "gh-manager/1.0", audit: Optional[AuditLogger] = None):
+         self.base = "https://api.github.com"
+         self.token = token or os.getenv("GITHUB_TOKEN")
+         self.headers = {"Accept": "application/vnd.github+json", "User-Agent": user_agent}
++        self.audit = audit
++        self.log = logging.getLogger("gh_manager.github")
+         if self.token:
+             self.headers["Authorization"] = f"Bearer {self.token}"
+ 
+     def _request(self, method: str, url: str, data: Optional[bytes] = None, headers: Optional[Dict[str, str]] = None) -> Tuple[int, Dict[str, str], bytes]:
++        self.log.debug("%s %s", method, url)
+         req = urllib.request.Request(url, data=data, method=method)
+         for k, v in self.headers.items():
+             req.add_header(k, v)
+@@ -31,8 +151,12 @@ class GitHubClient:
+                 req.add_header(k, v)
+         try:
+             with urllib.request.urlopen(req, timeout=60) as resp:
+-                return resp.getcode(), dict(resp.headers), resp.read()
++                status = resp.getcode()
++                body = resp.read()
++                self.log.debug("status=%s url=%s", status, url)
++                return status, dict(resp.headers), body
+         except urllib.error.HTTPError as e:
++            self.log.debug("status=%s url=%s", e.code, url)
+             return e.code, dict(e.headers), e.read() if e.fp else b""
+         except urllib.error.URLError as e:
+             raise RuntimeError(f"Network error: {e}") from e
+@@ -133,6 +257,8 @@ class GitHubClient:
+     def set_topics(self, owner: str, name: str, topics: List[str]) -> bool:
+         payload = {"names": topics}
+         status, _, _ = self._request("PUT", f"{self.base}/repos/{owner}/{name}/topics", data=json.dumps(payload).encode(), headers={"Content-Type": "application/json"})
++        if 200 <= status < 300 and self.audit:
++            self.audit.emit({"owner": owner, "repo": name, "action": "set_topics", "ok": True, "topics": topics})
+         return 200 <= status < 300
+ 
+     def update_repo_description(self, owner: str, name: str, description: Optional[str] = None, homepage: Optional[str] = None) -> bool:
+@@ -144,6 +270,8 @@ class GitHubClient:
+         if not payload:
+             return True
+         status, _, _ = self._request("PATCH", f"{self.base}/repos/{owner}/{name}", data=json.dumps(payload).encode(), headers={"Content-Type": "application/json"})
++        if 200 <= status < 300 and self.audit:
++            self.audit.emit({"owner": owner, "repo": name, "action": "update_repo_description", "ok": True, "payload": payload})
+         return 200 <= status < 300
+ 
+     def get_tree(self, owner: str, name: str, branch: str, recursive: bool = True) -> Dict:
+@@ -192,10 +320,14 @@ class GitHubClient:
+     def enable_issues(self, owner: str, name: str) -> bool:
+         payload = {"has_issues": True}
+         status, _, _ = self._request("PATCH", f"{self.base}/repos/{owner}/{name}", data=json.dumps(payload).encode(), headers={"Content-Type": "application/json"})
++        if status in (200, 201) and self.audit:
++            self.audit.emit({"owner": owner, "repo": name, "action": "enable_issues", "ok": True})
+         return status in (200, 201)
+ 
+     def set_default_branch(self, owner: str, name: str, branch: str) -> bool:
+         status, _, _ = self._request("PATCH", f"{self.base}/repos/{owner}/{name}", data=json.dumps({"default_branch": branch}).encode(), headers={"Content-Type": "application/json"})
++        if status in (200, 201) and self.audit:
++            self.audit.emit({"owner": owner, "repo": name, "action": "set_default_branch", "ok": True, "branch": branch})
+         return status in (200, 201)
+ 
+     def branch_protection_exists(self, owner: str, name: str, branch: str) -> bool:
+@@ -211,6 +343,8 @@ class GitHubClient:
+             "restrictions": None,
+         }
+         status, _, _ = self._request("PUT", url, data=json.dumps(payload).encode(), headers={"Content-Type": "application/json"})
++        if 200 <= status < 300 and self.audit:
++            self.audit.emit({"owner": owner, "repo": name, "action": "protect_branch", "ok": True, "branch": branch, "admins": admins, "reviews": reviews})
+         return 200 <= status < 300
+ 
+     def get_branch_sha(self, owner: str, name: str, branch: str) -> Optional[str]:
+@@ -228,19 +362,27 @@ class GitHubClient:
+             return False
+         payload = {"ref": f"refs/heads/{new_branch}", "sha": sha}
+         status, _, _ = self._request("POST", f"{self.base}/repos/{owner}/{name}/git/refs", data=json.dumps(payload).encode(), headers={"Content-Type": "application/json"})
++        if status in (200, 201) and self.audit:
++            self.audit.emit({"owner": owner, "repo": name, "action": "create_branch", "ok": True, "new_branch": new_branch, "base_branch": base_branch})
+         return status in (201, 200)
+ 
+     def rename_branch(self, owner: str, name: str, old: str, new: str) -> bool:
+         status, _, _ = self._request("POST", f"{self.base}/repos/{owner}/{name}/branches/{urllib.parse.quote(old)}/rename", data=json.dumps({"new_name": new}).encode(), headers={"Content-Type": "application/json"})
++        if 200 <= status < 300 and self.audit:
++            self.audit.emit({"owner": owner, "repo": name, "action": "rename_branch", "ok": True, "old": old, "new": new})
+         return 200 <= status < 300
+ 
+     def create_issue(self, owner: str, name: str, title: str, body: str) -> bool:
+         status, _, _ = self._request("POST", f"{self.base}/repos/{owner}/{name}/issues", data=json.dumps({"title": title, "body": body}).encode(), headers={"Content-Type": "application/json"})
++        if status in (200, 201) and self.audit:
++            self.audit.emit({"owner": owner, "repo": name, "action": "create_issue", "ok": True, "title": title})
+         return status in (201, 200)
+ 
+     def create_pull_request(self, owner: str, name: str, title: str, body: str, head: str, base: str) -> bool:
+         payload = {"title": title, "body": body, "head": head, "base": base}
+         status, _, _ = self._request("POST", f"{self.base}/repos/{owner}/{name}/pulls", data=json.dumps(payload).encode(), headers={"Content-Type": "application/json"})
++        if status in (200, 201) and self.audit:
++            self.audit.emit({"owner": owner, "repo": name, "action": "create_pull_request", "ok": True, "title": title, "head": head, "base": base})
+         return status in (201, 200)
+ 
+     def list_branches(self, owner: str, name: str) -> List[Dict]:
+@@ -272,9 +414,26 @@ class GitHubClient:
+         if sha:
+             payload["sha"] = sha
+         status2, _, _ = self._request("PUT", url, data=json.dumps(payload).encode(), headers={"Content-Type": "application/json"})
++        if status2 in (200, 201) and self.audit:
++            self.audit.emit({"owner": owner, "repo": name, "action": "create_or_update_file", "ok": True, "path": path, "branch": branch, "message": message})
+         return status2 in (200, 201)
+ 
+ 
++class FixtureGitHubClient(GitHubClient):
++    def __init__(self, fixtures_dir: str, token: Optional[str] = None, user_agent: str = "gh-manager/1.0", audit: Optional[AuditLogger] = None):
++        super().__init__(token=token, user_agent=user_agent, audit=audit)
++        self.fixtures_dir = Path(fixtures_dir)
++
++    def _request(self, method: str, url: str, data: Optional[bytes] = None, headers: Optional[Dict[str, str]] = None) -> Tuple[int, Dict[str, str], bytes]:
++        fname = _fixture_filename(method, url)
++        p = self.fixtures_dir / fname
++        if method.upper() != "GET":
++            return 501, {}, b""
++        if not p.exists():
++            return 404, {}, b""
++        return 200, {}, p.read_bytes()
++
++
+ class RepoAnalyzer:
+     def __init__(self, gh: GitHubClient, owner: str, target_branch_name: str = "main", concurrency: int = 4):
+         self.gh = gh
+@@ -426,6 +585,7 @@ class DeepAnalyzer:
+         techs = set(k.lower() for k in languages.keys())
+         node_deps = set(deps.get("node", []))
+         py_deps = set(deps.get("python", []))
++        lower_paths = [p.lower() for p in paths if isinstance(p, str)]
+         if {"react", "react-dom"} & node_deps:
+             techs.add("react")
+         if "next" in node_deps:
+@@ -436,10 +596,19 @@ class DeepAnalyzer:
+             techs.add("flask")
+         if "django" in py_deps:
+             techs.add("django")
+-        if any(p.endswith(".ipynb") for p in paths):
++        if any(p.endswith(".ipynb") for p in lower_paths):
+             techs.add("jupyter")
+-        if any(p.endswith(".tf") for p in paths):
++        if any(p.endswith(".tf") for p in lower_paths):
+             techs.add("terraform")
++        helm_signals = ("chart.yaml", "values.yaml")
++        if any(p.endswith(helm_signals) or p.startswith(("helm/", "charts/", "chart/")) or "/charts/" in p for p in lower_paths):
++            techs.add("helm")
++        if any(p.startswith(("k8s/", "kubernetes/")) or "/k8s/" in p or "/kubernetes/" in p for p in lower_paths):
++            techs.add("kubernetes")
++        monorepo_signals = ("pnpm-workspace.yaml", "turbo.json", "nx.json", "lerna.json")
++        pkg_json_count = sum(1 for p in lower_paths if p.endswith("package.json"))
++        if pkg_json_count > 1 or any(p.startswith("packages/") for p in lower_paths) or any(p.endswith(monorepo_signals) for p in lower_paths):
++            techs.add("monorepo")
+         return list(techs)
+ 
+ 
+@@ -536,6 +705,50 @@ class Optimizer:
+                 plans.append({"name": row["name"], "actions": actions})
+         return plans
+ 
++    def preview(self, plans: List[Dict], default_branches: Dict[str, str]) -> List[Dict]:
++        rows: List[Dict] = []
++        for plan in plans:
++            name = plan["name"]
++            ref = default_branches.get(name) or self.target_branch_name
++            diffs: List[Dict] = []
++            for action in plan["actions"]:
++                fc = self._file_change_for_action(name, action)
++                if not fc:
++                    diffs.append({"path": "", "message": action, "diff": ""})
++                    continue
++                path, message, content = fc
++                old = self.gh.get_file_text(self.owner, name, path, ref=ref)
++                old_text = old or ""
++                diff_text = unified_diff_text(old_text, content, path)
++                if old is None and not diff_text:
++                    diff_text = f"CREATE {path}"
++                diffs.append({"path": path, "message": message, "diff": diff_text})
++            rows.append({"name": name, "actions": plan["actions"], "diffs": diffs})
++        return rows
++
++    def _file_change_for_action(self, repo: str, action: str) -> Optional[Tuple[str, str, str]]:
++        y = time.gmtime().tm_year
++        if action == "create_readme":
++            content = self.templates.get("readme", f"# {repo}\n")
++            content = content.replace("{{REPO_NAME}}", repo).replace("{{OWNER}}", self.owner).replace("{{YEAR}}", str(y))
++            return "README.md", "Add README", content
++        if action.startswith("create_license:"):
++            spdx = action.split(":", 1)[1]
++            text = self.templates.get("license", self._license_text(spdx, repo))
++            text = text.replace("{{REPO_NAME}}", repo).replace("{{OWNER}}", self.owner).replace("{{YEAR}}", str(y))
++            return "LICENSE", "Add LICENSE", text
++        if action == "ensure_workflows":
++            wf = self.templates.get("workflow_ci", "name: CI\non: [push]\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - name: Build\n        run: echo Build\n")
++            return ".github/workflows/ci.yml", "Add basic CI workflow", wf
++        if action == "create_codeowners":
++            co = self.templates.get("codeowners", "* @%s" % self.owner)
++            co = co.replace("OWNER_OR_TEAM", self.owner).replace("@@", "@")
++            return ".github/CODEOWNERS", "Add CODEOWNERS", co
++        if action == "create_editorconfig":
++            ec = self.templates.get("editorconfig", "root = true\n\n[*]\nend_of_line = lf\ninsert_final_newline = true\ncharset = utf-8\nindent_style = space\nindent_size = 2\n")
++            return ".editorconfig", "Add .editorconfig", ec
++        return None
++
+     def execute(self, plans: List[Dict], branch: Optional[str] = None, open_pr: bool = False, base_branch: Optional[str] = None) -> List[Dict]:
+         results: List[Dict] = []
+         for plan in plans:
+@@ -676,6 +889,12 @@ def write_html(rows: List[Dict], out_path: Path, title: str = "Reporte") -> None
+ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
+     p = argparse.ArgumentParser(prog="gh-manager", description="Gestor de repositorios de GitHub")
+     p.add_argument("--token", help="Token de acceso a GitHub. Por defecto GITHUB_TOKEN", default=None)
++    p.add_argument("--config", default=None, help="Ruta a config.json con defaults y convenciones")
++    p.add_argument("--log-level", default="INFO", help="Nivel de logging (DEBUG, INFO, WARNING, ERROR)")
++    p.add_argument("--log-file", default=None, help="Ruta a fichero de log")
++    p.add_argument("--audit-file", default=None, help="Ruta a fichero JSONL de auditoría")
++    p.add_argument("--offline", action="store_true", help="Ejecutar sin red usando fixtures locales")
++    p.add_argument("--fixtures-dir", default="fixtures/sample", help="Directorio con fixtures JSON para --offline")
+     sub = p.add_subparsers(dest="cmd", required=True)
+ 
+     def add_owner_args(sp):
+@@ -762,341 +981,364 @@ def resolve_owner(args: argparse.Namespace) -> Tuple[str, str]:
+ 
+ def main(argv: Optional[List[str]] = None) -> int:
+     args = parse_args(argv)
+-    gh = GitHubClient(token=args.token)
+-    owner, owner_type = resolve_owner(args)
+-    archived = None if not getattr(args, "include_archived", False) else None
+-    if args.cmd == "listar":
+-        repos = gh.list_repos(owner, owner_type=owner_type, visibility=args.visibility, archived=archived)
+-        rows = [{"name": r.get("name"), "private": bool(r.get("private")), "archived": bool(r.get("archived")), "default_branch": r.get("default_branch")} for r in repos]
+-        print_table(rows, [("name", "Repositorio"), ("private", "Privado"), ("archived", "Archivado"), ("default_branch", "Rama por defecto")])
+-        return 0
+-    if args.cmd == "estado":
+-        repos = gh.list_repos(owner, owner_type=owner_type, visibility=args.visibility, archived=archived)
+-        analyzer = RepoAnalyzer(gh, owner, target_branch_name=args.branch_objetivo, concurrency=args.concurrency)
+-        rows = analyzer.summarize(repos)
+-        if args.output == "table":
+-            print_table(
+-                rows,
+-                [
+-                    ("name", "Repositorio"),
+-                    ("private", "Privado"),
+-                    ("archived", "Archivado"),
+-                    ("default_branch", "Rama"),
+-                    ("branch_name_ok", "Nombre OK"),
+-                    ("branch_protected", "Protegida"),
+-                    ("has_readme", "README"),
+-                    ("has_license", "LICENSE"),
+-                    ("has_workflows", "Workflows"),
+-                    ("has_codeowners", "CODEOWNERS"),
+-                    ("has_editorconfig", ".editorconfig"),
+-                    ("issues_enabled", "Issues"),
+-                    ("open_issues", "Abiertas"),
+-                    ("error", "Error"),
+-                ],
+-            )
+-        else:
+-            out_dir = Path(args.out_dir)
+-            out_dir.mkdir(parents=True, exist_ok=True)
+-            ts = int(time.time())
+-            if args.output == "json":
+-                write_json(rows, out_dir / f"estado_{owner}_{ts}.json")
+-            elif args.output == "csv":
+-                write_csv(rows, out_dir / f"estado_{owner}_{ts}.csv")
+-            elif args.output == "html":
+-                write_html(rows, out_dir / f"estado_{owner}_{ts}.html", title=f"Estado repos {owner}")
+-        return 0
+-    if args.cmd == "descargar":
+-        repos = gh.list_repos(owner, owner_type=owner_type, visibility=args.visibility, archived=archived)
+-        names = [r.get("name") for r in repos]
+-        selected = args.repos if args.repos else names
+-        downloader = RepoDownloader(gh, owner, Path(args.dest))
+-        results = downloader.download(selected, ref=args.ref)
+-        for name, path in results:
+-            print(f"{name}: {path}")
+-        return 0
+-    if args.cmd == "optimizar":
+-        repos = gh.list_repos(owner, owner_type=owner_type, visibility=args.visibility, archived=archived)
+-        names = set([r.get("name") for r in repos])
+-        selected = names if not args.repos else [n for n in args.repos if n in names]
+-        subset = [r for r in repos if r.get("name") in selected]
+-        analyzer = RepoAnalyzer(gh, owner, target_branch_name=args.branch_objetivo, concurrency=args.concurrency)
+-        status_rows = analyzer.summarize(subset)
+-        templates: Dict[str, str] = {}
+-        if args.plantilla_readme and Path(args.plantilla_readme).exists():
+-            templates["readme"] = Path(args.plantilla_readme).read_text(encoding="utf-8")
+-        if args.plantilla_license and Path(args.plantilla_license).exists():
+-            templates["license"] = Path(args.plantilla_license).read_text(encoding="utf-8")
+-        if args.plantilla_codeowners and Path(args.plantilla_codeowners).exists():
+-            templates["codeowners"] = Path(args.plantilla_codeowners).read_text(encoding="utf-8")
+-        if args.plantilla_editorconfig and Path(args.plantilla_editorconfig).exists():
+-            templates["editorconfig"] = Path(args.plantilla_editorconfig).read_text(encoding="utf-8")
+-        if "readme" not in templates or "license" not in templates or "codeowners" not in templates or "editorconfig" not in templates:
+-            base = Path(__file__).parent / "plantillas"
+-            if "readme" not in templates:
+-                p = base / "README.md"
+-                if p.exists():
+-                    templates["readme"] = p.read_text(encoding="utf-8")
+-            if "license" not in templates:
+-                p = base / "LICENSE_MIT.txt"
+-                if p.exists():
+-                    templates["license"] = p.read_text(encoding="utf-8")
+-            if "codeowners" not in templates:
+-                p = base / "CODEOWNERS"
+-                if p.exists():
+-                    templates["codeowners"] = p.read_text(encoding="utf-8")
+-            if "editorconfig" not in templates:
+-                p = base / ".editorconfig"
+-                if p.exists():
+-                    templates["editorconfig"] = p.read_text(encoding="utf-8")
+-            p = base / "ci.yml"
+-            if p.exists():
+-                templates["workflow_ci"] = p.read_text(encoding="utf-8")
+-        optimizer = Optimizer(gh, owner, target_branch_name=args.branch_objetivo, templates=templates)
+-        plans = optimizer.plan(
+-            status_rows,
+-            args.crear_readme,
+-            args.crear_license,
+-            args.asegurar_workflows,
+-            args.habilitar_issues,
+-            create_codeowners=args.crear_codeowners,
+-            create_editorconfig=args.crear_editorconfig,
+-            protect_branch=args.proteger_branch,
+-            rename_branch=args.renombrar_branch,
+-            ensure_main=args.asegurar_main,
+-            default_main=args.default_main,
+-        )
+-        if args.dry_run or not (
+-            args.crear_readme
+-            or args.crear_license
+-            or args.asegurar_workflows
+-            or args.habilitar_issues
+-            or args.crear_codeowners
+-            or args.crear_editorconfig
+-            or args.proteger_branch
+-            or args.renombrar_branch
+-            or args.asegurar_main
+-            or args.default_main
+-            or args.crear_issue_housekeeping
+-            or args.crear_pr_housekeeping
+-        ):
++    argv_list = argv if argv is not None else sys.argv[1:]
++    cfg = load_config(getattr(args, "config", None))
++    apply_config_defaults(args, argv_list, cfg)
++    setup_logging(args.log_level, args.log_file)
++    audit = AuditLogger(args.audit_file) if args.audit_file else None
++    try:
++        gh = FixtureGitHubClient(args.fixtures_dir, token=args.token, audit=audit) if args.offline else GitHubClient(token=args.token, audit=audit)
++        owner, owner_type = resolve_owner(args)
++        archived = None if not getattr(args, "include_archived", False) else None
++        if args.cmd == "listar":
++            repos = gh.list_repos(owner, owner_type=owner_type, visibility=args.visibility, archived=archived)
++            rows = [{"name": r.get("name"), "private": bool(r.get("private")), "archived": bool(r.get("archived")), "default_branch": r.get("default_branch")} for r in repos]
++            print_table(rows, [("name", "Repositorio"), ("private", "Privado"), ("archived", "Archivado"), ("default_branch", "Rama por defecto")])
++            return 0
++        if args.cmd == "estado":
++            repos = gh.list_repos(owner, owner_type=owner_type, visibility=args.visibility, archived=archived)
++            analyzer = RepoAnalyzer(gh, owner, target_branch_name=args.branch_objetivo, concurrency=args.concurrency)
++            rows = analyzer.summarize(repos)
+             if args.output == "table":
+-                print_table(plans, [("name", "Repositorio"), ("actions", "Acciones")])
++                print_table(
++                    rows,
++                    [
++                        ("name", "Repositorio"),
++                        ("private", "Privado"),
++                        ("archived", "Archivado"),
++                        ("default_branch", "Rama"),
++                        ("branch_name_ok", "Nombre OK"),
++                        ("branch_protected", "Protegida"),
++                        ("has_readme", "README"),
++                        ("has_license", "LICENSE"),
++                        ("has_workflows", "Workflows"),
++                        ("has_codeowners", "CODEOWNERS"),
++                        ("has_editorconfig", ".editorconfig"),
++                        ("issues_enabled", "Issues"),
++                        ("open_issues", "Abiertas"),
++                        ("error", "Error"),
++                    ],
++                )
+             else:
+                 out_dir = Path(args.out_dir)
++                out_dir.mkdir(parents=True, exist_ok=True)
+                 ts = int(time.time())
+                 if args.output == "json":
+-                    write_json(plans, out_dir / f"plan_{owner}_{ts}.json")
++                    write_json(rows, out_dir / f"estado_{owner}_{ts}.json")
+                 elif args.output == "csv":
+-                    write_csv(plans, out_dir / f"plan_{owner}_{ts}.csv")
++                    write_csv(rows, out_dir / f"estado_{owner}_{ts}.csv")
+                 elif args.output == "html":
+-                    write_html(plans, out_dir / f"plan_{owner}_{ts}.html", title=f"Plan optimización {owner}")
++                    write_html(rows, out_dir / f"estado_{owner}_{ts}.html", title=f"Estado repos {owner}")
+             return 0
+-        results: List[Dict] = []
+-        if args.crear_pr_housekeeping and args.branch and status_rows:
+-            base_branch = status_rows[0].get("default_branch") or args.branch_objetivo
+-            results = optimizer.execute(plans, branch=args.branch, open_pr=True, base_branch=base_branch)
+-        else:
+-            results = optimizer.execute(plans, branch=None)
+-        if args.crear_issue_housekeeping and results:
+-            for r in results:
+-                if r.get("executed"):
+-                    title = "Housekeeping"
+-                    body = "Se proponen o ejecutan acciones: " + ", ".join(r.get("executed", []))
+-                    gh.create_issue(owner, r["name"], title, body)
+-        if args.output == "table":
+-            print_table(results, [("name", "Repositorio"), ("executed", "Ejecutadas")])
+-        else:
+-            out_dir = Path(args.out_dir)
+-            ts = int(time.time())
+-            if args.output == "json":
+-                write_json(results, out_dir / f"resultado_{owner}_{ts}.json")
+-            elif args.output == "csv":
+-                write_csv(results, out_dir / f"resultado_{owner}_{ts}.csv")
+-            elif args.output == "html":
+-                write_html(results, out_dir / f"resultado_{owner}_{ts}.html", title=f"Resultados optimización {owner}")
+-        return 0
+-    if args.cmd == "analizar":
+-        repos = gh.list_repos(owner, owner_type=owner_type, visibility=args.visibility, archived=archived)
+-        names = [r.get("name") for r in repos]
+-        selected = set(args.repos) if args.repos else set(names)
+-        subset = [r for r in repos if r.get("name") in selected]
+-        deep = DeepAnalyzer(gh, owner)
+-        rows = [deep.analyze(r) for r in subset]
+-        if args.output == "table":
+-            print_table(rows, [("name", "Repositorio"), ("languages", "Lenguajes"), ("techs", "Tecnologías"), ("has_dockerfile", "Docker"), ("has_tests", "Tests"), ("files_count", "Ficheros")])
+-        else:
+-            out_dir = Path(args.out_dir)
+-            ts = int(time.time())
+-            if args.output == "json":
+-                write_json(rows, out_dir / f"analisis_{owner}_{ts}.json")
+-            elif args.output == "csv":
+-                write_csv(rows, out_dir / f"analisis_{owner}_{ts}.csv")
+-            elif args.output == "html":
+-                write_html(rows, out_dir / f"analisis_{owner}_{ts}.html", title=f"Análisis repos {owner}")
+-        return 0
+-    if args.cmd == "mejorar":
+-        repos = gh.list_repos(owner, owner_type=owner_type, visibility=args.visibility, archived=archived)
+-        names = [r.get("name") for r in repos]
+-        selected = set(args.repos) if args.repos else set(names)
+-        subset = [r for r in repos if r.get("name") in selected]
+-        base = Path(__file__).parent / "plantillas"
+-        deep = DeepAnalyzer(gh, owner)
+-        advisor = LicenseAdvisor()
+-        readme_gen = ReadmeGenerator(owner)
+-        results: List[Dict] = []
+-        import difflib
+-        for r in subset:
+-            name = r.get("name")
+-            analysis = deep.analyze(r)
+-            executed: List[str] = []
+-            diffs: List[Dict] = []
+-            def preview_or_apply(path: str, content: str, message: str) -> bool:
+-                if args.dry_run:
+-                    old = gh.get_file_text(owner, name, path, r.get("default_branch")) or ""
+-                    new = content
+-                    diff_text = "\n".join(difflib.unified_diff(old.splitlines(), new.splitlines(), fromfile=f"a/{path}", tofile=f"b/{path}", lineterm=""))
+-                    diffs.append({"path": path, "message": message, "diff": diff_text or f"CREATE {path}"})
+-                    return True
+-                return gh.create_or_update_file(owner, name, path, content, message)
+-            if args.recomendar_licencia:
+-                rec = advisor.recommend(r, analysis)
+-                executed.append(f"license_recommended:{rec}")
+-                if args.aplicar_licencia:
+-                    if rec == "proprietary":
+-                        lic_path = base / "LICENSE_PROPRIETARY.txt"
+-                        if lic_path.exists() and not gh.has_license(owner, name):
+-                            txt = lic_path.read_text(encoding="utf-8")
+-                            y = time.gmtime().tm_year
+-                            txt = txt.replace("{{OWNER}}", owner).replace("{{YEAR}}", str(y))
+-                            if preview_or_apply("LICENSE", txt, "Add proprietary LICENSE"):
+-                                executed.append("license_applied:proprietary")
+-                    elif rec in ("mit", "apache-2.0", "gpl-3.0"):
+-                        y = time.gmtime().tm_year
+-                        txt = Optimizer(gh, owner)._license_text(rec, name).replace("{{OWNER}}", owner).replace("{{YEAR}}", str(y))
+-                        if not gh.has_license(owner, name):
+-                            if preview_or_apply("LICENSE", txt, "Add LICENSE"):
+-                                executed.append(f"license_applied:{rec}")
+-            if args.auto_topics:
+-                add_topics = set(analysis.get("techs", []))
+-                cur_topics = set(gh.get_topics(owner, name))
+-                merged = sorted(cur_topics | add_topics)
+-                if merged != list(cur_topics):
+-                    if gh.set_topics(owner, name, merged):
+-                        executed.append("topics_updated")
+-            if args.auto_description and not (r.get("description") or "").strip():
+-                langs = ", ".join(sorted((analysis.get("languages") or {}).keys()))
+-                desc = f"{name}: {langs}"
+-                if args.dry_run:
+-                    executed.append("description_set(dry)")
+-                elif gh.update_repo_description(owner, name, description=desc):
+-                    executed.append("description_set")
+-            if args.gitignore_auto and not gh.has_file(owner, name, ".gitignore", r.get("default_branch")):
+-                gi_content = None
+-                langs = set((analysis.get("languages") or {}).keys())
+-                if "Python" in langs and (base / ".gitignore_python").exists():
+-                    gi_content = (base / ".gitignore_python").read_text(encoding="utf-8")
+-                elif ("JavaScript" in langs or "TypeScript" in langs) and (base / ".gitignore_node").exists():
+-                    gi_content = (base / ".gitignore_node").read_text(encoding="utf-8")
+-                if gi_content:
+-                    if preview_or_apply(".gitignore", gi_content, "Add .gitignore"):
+-                        executed.append("gitignore_added")
+-            if args.issues_templates and not gh.has_file(owner, name, ".github/ISSUE_TEMPLATE/bug_report.md", r.get("default_branch")):
+-                p = base / ".github" / "ISSUE_TEMPLATE" / "bug_report.md"
+-                if p.exists():
+-                    if preview_or_apply(".github/ISSUE_TEMPLATE/bug_report.md", p.read_text(encoding="utf-8"), "Add bug report template"):
+-                        executed.append("issue_template_bug")
+-                p2 = base / ".github" / "ISSUE_TEMPLATE" / "feature_request.md"
+-                if p2.exists() and not gh.has_file(owner, name, ".github/ISSUE_TEMPLATE/feature_request.md", r.get("default_branch")):
+-                    if preview_or_apply(".github/ISSUE_TEMPLATE/feature_request.md", p2.read_text(encoding="utf-8"), "Add feature request template"):
+-                        executed.append("issue_template_feature")
+-            if args.pr_template and not gh.has_file(owner, name, ".github/PULL_REQUEST_TEMPLATE.md", r.get("default_branch")):
+-                p = base / ".github" / "PULL_REQUEST_TEMPLATE.md"
++        if args.cmd == "descargar":
++            repos = gh.list_repos(owner, owner_type=owner_type, visibility=args.visibility, archived=archived)
++            names = [r.get("name") for r in repos]
++            selected = args.repos if args.repos else names
++            downloader = RepoDownloader(gh, owner, Path(args.dest))
++            results = downloader.download(selected, ref=args.ref)
++            for name, path in results:
++                print(f"{name}: {path}")
++            return 0
++        if args.cmd == "optimizar":
++            repos = gh.list_repos(owner, owner_type=owner_type, visibility=args.visibility, archived=archived)
++            names = set([r.get("name") for r in repos])
++            selected = names if not args.repos else [n for n in args.repos if n in names]
++            subset = [r for r in repos if r.get("name") in selected]
++            analyzer = RepoAnalyzer(gh, owner, target_branch_name=args.branch_objetivo, concurrency=args.concurrency)
++            status_rows = analyzer.summarize(subset)
++            templates: Dict[str, str] = {}
++            cfg_tpl = cfg.get("templates") if isinstance(cfg.get("templates"), dict) else {}
++            if isinstance(cfg_tpl, dict):
++                for k in ("readme", "license", "codeowners", "editorconfig", "workflow_ci"):
++                    v = cfg_tpl.get(k)
++                    if v and k not in templates and Path(v).exists():
++                        templates[k] = Path(v).read_text(encoding="utf-8")
++            if args.plantilla_readme and Path(args.plantilla_readme).exists():
++                templates["readme"] = Path(args.plantilla_readme).read_text(encoding="utf-8")
++            if args.plantilla_license and Path(args.plantilla_license).exists():
++                templates["license"] = Path(args.plantilla_license).read_text(encoding="utf-8")
++            if args.plantilla_codeowners and Path(args.plantilla_codeowners).exists():
++                templates["codeowners"] = Path(args.plantilla_codeowners).read_text(encoding="utf-8")
++            if args.plantilla_editorconfig and Path(args.plantilla_editorconfig).exists():
++                templates["editorconfig"] = Path(args.plantilla_editorconfig).read_text(encoding="utf-8")
++            if "readme" not in templates or "license" not in templates or "codeowners" not in templates or "editorconfig" not in templates:
++                base = Path(__file__).parent / "plantillas"
++                if "readme" not in templates:
++                    p = base / "README.md"
++                    if p.exists():
++                        templates["readme"] = p.read_text(encoding="utf-8")
++                if "license" not in templates:
++                    p = base / "LICENSE_MIT.txt"
++                    if p.exists():
++                        templates["license"] = p.read_text(encoding="utf-8")
++                if "codeowners" not in templates:
++                    p = base / "CODEOWNERS"
++                    if p.exists():
++                        templates["codeowners"] = p.read_text(encoding="utf-8")
++                if "editorconfig" not in templates:
++                    p = base / ".editorconfig"
++                    if p.exists():
++                        templates["editorconfig"] = p.read_text(encoding="utf-8")
++                p = base / "ci.yml"
+                 if p.exists():
+-                    if preview_or_apply(".github/PULL_REQUEST_TEMPLATE.md", p.read_text(encoding="utf-8"), "Add PR template"):
+-                        executed.append("pr_template")
+-            if args.generar_readme_auto:
+-                exists = gh.has_readme(owner, name)
+-                if args.forzar_readme or not exists:
+-                    content = readme_gen.build(r, analysis)
+-                    if preview_or_apply("README.md", content, "Generate README"):
+-                        executed.append("readme_generated")
+-            if args.workflows_ai and not gh.has_workflows(owner, name):
+-                wf = None
+-                langs = set((analysis.get("languages") or {}).keys())
+-                if analysis.get("node_monorepo") and (base / "workflows" / "ci_monorepo_node.yml").exists():
+-                    wf = (base / "workflows" / "ci_monorepo_node.yml").read_text(encoding="utf-8")
+-                elif "Go" in langs and (base / "workflows" / "ci_go.yml").exists():
+-                    wf = (base / "workflows" / "ci_go.yml").read_text(encoding="utf-8")
+-                elif "Rust" in langs and (base / "workflows" / "ci_rust.yml").exists():
+-                    wf = (base / "workflows" / "ci_rust.yml").read_text(encoding="utf-8")
+-                elif "Java" in langs and (base / "workflows" / "ci_java.yml").exists():
+-                    wf = (base / "workflows" / "ci_java.yml").read_text(encoding="utf-8")
+-                elif "Python" in langs and (base / "workflows" / "ci_python.yml").exists():
+-                    wf = (base / "workflows" / "ci_python.yml").read_text(encoding="utf-8")
+-                elif ("JavaScript" in langs or "TypeScript" in langs) and (base / "workflows" / "ci_node.yml").exists():
+-                    wf = (base / "workflows" / "ci_node.yml").read_text(encoding="utf-8")
+-                if wf:
+-                    if preview_or_apply(".github/workflows/ci.yml", wf, "Add CI workflow AI"):
+-                        executed.append("workflow_ai_added")
+-            if args.pages_static:
+-                pages_wf_path = ".github/workflows/pages.yml"
+-                has_pages_wf = gh.has_file(owner, name, pages_wf_path, r.get("default_branch"))
+-                if not has_pages_wf and (base / "workflows" / "pages_static.yml").exists():
+-                    wf = (base / "workflows" / "pages_static.yml").read_text(encoding="utf-8")
+-                    if preview_or_apply(pages_wf_path, wf, "Add Pages workflow"):
+-                        executed.append("pages_workflow_added")
+-                # Crear un index.html mínimo si no existe
+-                root = args.pages_root.strip("/")
+-                use_docsify = False
+-                if args.pages_template == "docsify":
+-                    use_docsify = True
+-                    root = "docs"
+-                index_path = f"{root}/index.html"
+-                if not gh.has_file(owner, name, index_path, r.get("default_branch")):
+-                    if use_docsify and (base / "pages" / "docsify_index.html").exists():
+-                        html = (base / "pages" / "docsify_index.html").read_text(encoding="utf-8")
++                    templates["workflow_ci"] = p.read_text(encoding="utf-8")
++            optimizer = Optimizer(gh, owner, target_branch_name=args.branch_objetivo, templates=templates)
++            plans = optimizer.plan(
++                status_rows,
++                args.crear_readme,
++                args.crear_license,
++                args.asegurar_workflows,
++                args.habilitar_issues,
++                create_codeowners=args.crear_codeowners,
++                create_editorconfig=args.crear_editorconfig,
++                protect_branch=args.proteger_branch,
++                rename_branch=args.renombrar_branch,
++                ensure_main=args.asegurar_main,
++                default_main=args.default_main,
++            )
++            want_diffs = bool(args.dry_run and (args.crear_readme or args.crear_license or args.asegurar_workflows or args.crear_codeowners or args.crear_editorconfig))
++            if args.dry_run or not (
++                args.crear_readme
++                or args.crear_license
++                or args.asegurar_workflows
++                or args.habilitar_issues
++                or args.crear_codeowners
++                or args.crear_editorconfig
++                or args.proteger_branch
++                or args.renombrar_branch
++                or args.asegurar_main
++                or args.default_main
++                or args.crear_issue_housekeeping
++                or args.crear_pr_housekeeping
++            ):
++                preview_rows = None
++                if want_diffs and plans:
++                    default_branches = {r.get("name"): (r.get("default_branch") or args.branch_objetivo) for r in status_rows if isinstance(r, dict) and r.get("name")}
++                    preview_rows = optimizer.preview(plans, default_branches)
++                if args.output == "table":
++                    if preview_rows is not None:
++                        slim = [{"name": r["name"], "actions": r.get("actions", []), "diffs": len([d for d in r.get("diffs", []) if d.get("diff")])} for r in preview_rows]
++                        print_table(slim, [("name", "Repositorio"), ("actions", "Acciones"), ("diffs", "Diffs")])
+                     else:
+-                        html = f"<!doctype html><meta charset='utf-8'><title>{name}</title><h1>{name}</h1><p>Publicado con GitHub Pages.</p>"
+-                    if preview_or_apply(index_path, html, "Add Pages public index"):
+-                        executed.append("pages_index_added")
+-                if use_docsify:
+-                    sb_path = f"{root}/_sidebar.md"
+-                    if not gh.has_file(owner, name, sb_path, r.get("default_branch")):
+-                        if (base / "pages" / "docsify_sidebar.md").exists():
+-                            if preview_or_apply(sb_path, (base / "pages" / "docsify_sidebar.md").read_text(encoding="utf-8"), "Add Docsify _sidebar.md"):
+-                                executed.append("pages_docsify_sidebar")
+-                    readme_path = f"{root}/README.md"
+-                    if not gh.has_file(owner, name, readme_path, r.get("default_branch")):
+-                        if (base / "pages" / "docsify_readme.md").exists():
+-                            if preview_or_apply(readme_path, (base / "pages" / "docsify_readme.md").read_text(encoding="utf-8"), "Add Docsify README.md"):
+-                                executed.append("pages_docsify_readme")
+-                # Configurar homepage si no está definida
+-                homepage = r.get("homepage") or ""
+-                if not homepage:
+-                    url = f"https://{owner}.github.io/{name}"
++                        print_table(plans, [("name", "Repositorio"), ("actions", "Acciones")])
++                else:
++                    out_dir = Path(args.out_dir)
++                    ts = int(time.time())
++                    payload = preview_rows if preview_rows is not None else plans
++                    if args.output == "json":
++                        write_json(payload, out_dir / f"plan_{owner}_{ts}.json")
++                    elif args.output == "csv":
++                        write_csv(payload, out_dir / f"plan_{owner}_{ts}.csv")
++                    elif args.output == "html":
++                        write_html(payload, out_dir / f"plan_{owner}_{ts}.html", title=f"Plan optimización {owner}")
++                return 0
++            results: List[Dict] = []
++            if args.crear_pr_housekeeping and args.branch and status_rows:
++                base_branch = status_rows[0].get("default_branch") or args.branch_objetivo
++                results = optimizer.execute(plans, branch=args.branch, open_pr=True, base_branch=base_branch)
++            else:
++                results = optimizer.execute(plans, branch=None)
++            if args.crear_issue_housekeeping and results:
++                for r in results:
++                    if r.get("executed"):
++                        title = "Housekeeping"
++                        body = "Se proponen o ejecutan acciones: " + ", ".join(r.get("executed", []))
++                        gh.create_issue(owner, r["name"], title, body)
++            if args.output == "table":
++                print_table(results, [("name", "Repositorio"), ("executed", "Ejecutadas")])
++            else:
++                out_dir = Path(args.out_dir)
++                ts = int(time.time())
++                if args.output == "json":
++                    write_json(results, out_dir / f"resultado_{owner}_{ts}.json")
++                elif args.output == "csv":
++                    write_csv(results, out_dir / f"resultado_{owner}_{ts}.csv")
++                elif args.output == "html":
++                    write_html(results, out_dir / f"resultado_{owner}_{ts}.html", title=f"Resultados optimización {owner}")
++            return 0
++        if args.cmd == "analizar":
++            repos = gh.list_repos(owner, owner_type=owner_type, visibility=args.visibility, archived=archived)
++            names = [r.get("name") for r in repos]
++            selected = set(args.repos) if args.repos else set(names)
++            subset = [r for r in repos if r.get("name") in selected]
++            deep = DeepAnalyzer(gh, owner)
++            rows = [deep.analyze(r) for r in subset]
++            if args.output == "table":
++                print_table(rows, [("name", "Repositorio"), ("languages", "Lenguajes"), ("techs", "Tecnologías"), ("has_dockerfile", "Docker"), ("has_tests", "Tests"), ("files_count", "Ficheros")])
++            else:
++                out_dir = Path(args.out_dir)
++                ts = int(time.time())
++                if args.output == "json":
++                    write_json(rows, out_dir / f"analisis_{owner}_{ts}.json")
++                elif args.output == "csv":
++                    write_csv(rows, out_dir / f"analisis_{owner}_{ts}.csv")
++                elif args.output == "html":
++                    write_html(rows, out_dir / f"analisis_{owner}_{ts}.html", title=f"Análisis repos {owner}")
++            return 0
++        if args.cmd == "mejorar":
++            repos = gh.list_repos(owner, owner_type=owner_type, visibility=args.visibility, archived=archived)
++            names = [r.get("name") for r in repos]
++            selected = set(args.repos) if args.repos else set(names)
++            subset = [r for r in repos if r.get("name") in selected]
++            base = Path(__file__).parent / "plantillas"
++            deep = DeepAnalyzer(gh, owner)
++            advisor = LicenseAdvisor()
++            readme_gen = ReadmeGenerator(owner)
++            results: List[Dict] = []
++            import difflib
++            for r in subset:
++                name = r.get("name")
++                analysis = deep.analyze(r)
++                executed: List[str] = []
++                diffs: List[Dict] = []
++                def preview_or_apply(path: str, content: str, message: str) -> bool:
+                     if args.dry_run:
+-                        executed.append("homepage_set(dry)")
+-                    elif gh.update_repo_description(owner, name, homepage=url):
+-                        executed.append("homepage_set")
+-            row = {"name": name, "executed": executed}
+-            if args.dry_run:
+-                row["diffs"] = diffs
+-            results.append(row)
+-        if args.output == "table":
+-            print_table(results, [("name", "Repositorio"), ("executed", "Acciones")])
+-        else:
+-            out_dir = Path(args.out_dir)
+-            ts = int(time.time())
+-            if args.output == "json":
+-                write_json(results, out_dir / f"mejoras_{owner}_{ts}.json")
+-            elif args.output == "csv":
+-                write_csv(results, out_dir / f"mejoras_{owner}_{ts}.csv")
+-            elif args.output == "html":
+-                write_html(results, out_dir / f"mejoras_{owner}_{ts}.html", title=f"Mejoras repos {owner}")
+-        return 0
+-    return 1
++                        old = gh.get_file_text(owner, name, path, r.get("default_branch")) or ""
++                        new = content
++                        diff_text = "\n".join(difflib.unified_diff(old.splitlines(), new.splitlines(), fromfile=f"a/{path}", tofile=f"b/{path}", lineterm=""))
++                        diffs.append({"path": path, "message": message, "diff": diff_text or f"CREATE {path}"})
++                        return True
++                    return gh.create_or_update_file(owner, name, path, content, message)
++                if args.recomendar_licencia:
++                    rec = advisor.recommend(r, analysis)
++                    executed.append(f"license_recommended:{rec}")
++                    if args.aplicar_licencia:
++                        if rec == "proprietary":
++                            lic_path = base / "LICENSE_PROPRIETARY.txt"
++                            if lic_path.exists() and not gh.has_license(owner, name):
++                                txt = lic_path.read_text(encoding="utf-8")
++                                y = time.gmtime().tm_year
++                                txt = txt.replace("{{OWNER}}", owner).replace("{{YEAR}}", str(y))
++                                if preview_or_apply("LICENSE", txt, "Add proprietary LICENSE"):
++                                    executed.append("license_applied:proprietary")
++                        elif rec in ("mit", "apache-2.0", "gpl-3.0"):
++                            y = time.gmtime().tm_year
++                            txt = Optimizer(gh, owner)._license_text(rec, name).replace("{{OWNER}}", owner).replace("{{YEAR}}", str(y))
++                            if not gh.has_license(owner, name):
++                                if preview_or_apply("LICENSE", txt, "Add LICENSE"):
++                                    executed.append(f"license_applied:{rec}")
++                if args.auto_topics:
++                    add_topics = set(analysis.get("techs", []))
++                    cur_topics = set(gh.get_topics(owner, name))
++                    extra = cfg.get("topics_extra") if isinstance(cfg.get("topics_extra"), list) else []
++                    merged = sorted(cur_topics | add_topics | set([t for t in extra if isinstance(t, str) and t.strip()]))
++                    if merged != list(cur_topics):
++                        if gh.set_topics(owner, name, merged):
++                            executed.append("topics_updated")
++                if args.auto_description and not (r.get("description") or "").strip():
++                    langs = ", ".join(sorted((analysis.get("languages") or {}).keys()))
++                    desc = f"{name}: {langs}"
++                    if args.dry_run:
++                        executed.append("description_set(dry)")
++                    elif gh.update_repo_description(owner, name, description=desc):
++                        executed.append("description_set")
++                if args.gitignore_auto and not gh.has_file(owner, name, ".gitignore", r.get("default_branch")):
++                    gi_content = None
++                    langs = set((analysis.get("languages") or {}).keys())
++                    if "Python" in langs and (base / ".gitignore_python").exists():
++                        gi_content = (base / ".gitignore_python").read_text(encoding="utf-8")
++                    elif ("JavaScript" in langs or "TypeScript" in langs) and (base / ".gitignore_node").exists():
++                        gi_content = (base / ".gitignore_node").read_text(encoding="utf-8")
++                    if gi_content:
++                        if preview_or_apply(".gitignore", gi_content, "Add .gitignore"):
++                            executed.append("gitignore_added")
++                if args.issues_templates and not gh.has_file(owner, name, ".github/ISSUE_TEMPLATE/bug_report.md", r.get("default_branch")):
++                    p = base / ".github" / "ISSUE_TEMPLATE" / "bug_report.md"
++                    if p.exists():
++                        if preview_or_apply(".github/ISSUE_TEMPLATE/bug_report.md", p.read_text(encoding="utf-8"), "Add bug report template"):
++                            executed.append("issue_template_bug")
++                    p2 = base / ".github" / "ISSUE_TEMPLATE" / "feature_request.md"
++                    if p2.exists() and not gh.has_file(owner, name, ".github/ISSUE_TEMPLATE/feature_request.md", r.get("default_branch")):
++                        if preview_or_apply(".github/ISSUE_TEMPLATE/feature_request.md", p2.read_text(encoding="utf-8"), "Add feature request template"):
++                            executed.append("issue_template_feature")
++                if args.pr_template and not gh.has_file(owner, name, ".github/PULL_REQUEST_TEMPLATE.md", r.get("default_branch")):
++                    p = base / ".github" / "PULL_REQUEST_TEMPLATE.md"
++                    if p.exists():
++                        if preview_or_apply(".github/PULL_REQUEST_TEMPLATE.md", p.read_text(encoding="utf-8"), "Add PR template"):
++                            executed.append("pr_template")
++                if args.generar_readme_auto:
++                    exists = gh.has_readme(owner, name)
++                    if args.forzar_readme or not exists:
++                        content = readme_gen.build(r, analysis)
++                        if preview_or_apply("README.md", content, "Generate README"):
++                            executed.append("readme_generated")
++                if args.workflows_ai and not gh.has_workflows(owner, name):
++                    wf = None
++                    langs = set((analysis.get("languages") or {}).keys())
++                    if analysis.get("node_monorepo") and (base / "workflows" / "ci_monorepo_node.yml").exists():
++                        wf = (base / "workflows" / "ci_monorepo_node.yml").read_text(encoding="utf-8")
++                    elif "Go" in langs and (base / "workflows" / "ci_go.yml").exists():
++                        wf = (base / "workflows" / "ci_go.yml").read_text(encoding="utf-8")
++                    elif "Rust" in langs and (base / "workflows" / "ci_rust.yml").exists():
++                        wf = (base / "workflows" / "ci_rust.yml").read_text(encoding="utf-8")
++                    elif "Java" in langs and (base / "workflows" / "ci_java.yml").exists():
++                        wf = (base / "workflows" / "ci_java.yml").read_text(encoding="utf-8")
++                    elif "Python" in langs and (base / "workflows" / "ci_python.yml").exists():
++                        wf = (base / "workflows" / "ci_python.yml").read_text(encoding="utf-8")
++                    elif ("JavaScript" in langs or "TypeScript" in langs) and (base / "workflows" / "ci_node.yml").exists():
++                        wf = (base / "workflows" / "ci_node.yml").read_text(encoding="utf-8")
++                    if wf:
++                        if preview_or_apply(".github/workflows/ci.yml", wf, "Add CI workflow AI"):
++                            executed.append("workflow_ai_added")
++                if args.pages_static:
++                    pages_wf_path = ".github/workflows/pages.yml"
++                    has_pages_wf = gh.has_file(owner, name, pages_wf_path, r.get("default_branch"))
++                    if not has_pages_wf and (base / "workflows" / "pages_static.yml").exists():
++                        wf = (base / "workflows" / "pages_static.yml").read_text(encoding="utf-8")
++                        if preview_or_apply(pages_wf_path, wf, "Add Pages workflow"):
++                            executed.append("pages_workflow_added")
++                    root = args.pages_root.strip("/")
++                    use_docsify = False
++                    if args.pages_template == "docsify":
++                        use_docsify = True
++                        root = "docs"
++                    index_path = f"{root}/index.html"
++                    if not gh.has_file(owner, name, index_path, r.get("default_branch")):
++                        if use_docsify and (base / "pages" / "docsify_index.html").exists():
++                            html = (base / "pages" / "docsify_index.html").read_text(encoding="utf-8")
++                        else:
++                            html = f"<!doctype html><meta charset='utf-8'><title>{name}</title><h1>{name}</h1><p>Publicado con GitHub Pages.</p>"
++                        if preview_or_apply(index_path, html, "Add Pages public index"):
++                            executed.append("pages_index_added")
++                    if use_docsify:
++                        sb_path = f"{root}/_sidebar.md"
++                        if not gh.has_file(owner, name, sb_path, r.get("default_branch")):
++                            if (base / "pages" / "docsify_sidebar.md").exists():
++                                if preview_or_apply(sb_path, (base / "pages" / "docsify_sidebar.md").read_text(encoding="utf-8"), "Add Docsify _sidebar.md"):
++                                    executed.append("pages_docsify_sidebar")
++                        readme_path = f"{root}/README.md"
++                        if not gh.has_file(owner, name, readme_path, r.get("default_branch")):
++                            if (base / "pages" / "docsify_readme.md").exists():
++                                if preview_or_apply(readme_path, (base / "pages" / "docsify_readme.md").read_text(encoding="utf-8"), "Add Docsify README.md"):
++                                    executed.append("pages_docsify_readme")
++                    homepage = r.get("homepage") or ""
++                    if not homepage:
++                        url = f"https://{owner}.github.io/{name}"
++                        if args.dry_run:
++                            executed.append("homepage_set(dry)")
++                        elif gh.update_repo_description(owner, name, homepage=url):
++                            executed.append("homepage_set")
++                row = {"name": name, "executed": executed}
++                if args.dry_run:
++                    row["diffs"] = diffs
++                results.append(row)
++            if args.output == "table":
++                print_table(results, [("name", "Repositorio"), ("executed", "Acciones")])
++            else:
++                out_dir = Path(args.out_dir)
++                ts = int(time.time())
++                if args.output == "json":
++                    write_json(results, out_dir / f"mejoras_{owner}_{ts}.json")
++                elif args.output == "csv":
++                    write_csv(results, out_dir / f"mejoras_{owner}_{ts}.csv")
++                elif args.output == "html":
++                    write_html(results, out_dir / f"mejoras_{owner}_{ts}.html", title=f"Mejoras repos {owner}")
++            return 0
++        return 1
++    finally:
++        if audit:
++            audit.close()
+ 
+ 
+ if __name__ == "__main__":
+     sys.exit(main())
+-
+diff --git a/gui.py b/gui.py
+index 7175952..3e3b6c3 100644
+--- a/gui.py
++++ b/gui.py
+@@ -1,11 +1,12 @@
+ import sys
+ import time
++import json
+ import difflib
+ from pathlib import Path
+ from typing import Dict, List
+ from PyQt6.QtCore import Qt, QThread, pyqtSignal
+-from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QComboBox, QCheckBox, QSpinBox, QFileDialog, QTableWidget, QTableWidgetItem, QAbstractItemView, QMessageBox, QGroupBox, QTextEdit
+-from gh_manager import GitHubClient, RepoAnalyzer, Optimizer, DeepAnalyzer, LicenseAdvisor, ReadmeGenerator, write_json, write_csv, write_html
++from PyQt6.QtWidgets import QApplication, QDialog, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QComboBox, QCheckBox, QSpinBox, QFileDialog, QTableWidget, QTableWidgetItem, QAbstractItemView, QMessageBox, QGroupBox, QTextEdit
++from gh_manager import AuditLogger, FixtureGitHubClient, GitHubClient, RepoAnalyzer, Optimizer, DeepAnalyzer, LicenseAdvisor, ReadmeGenerator, write_json, write_csv, write_html
+ 
+ 
+ class Worker(QThread):
+@@ -20,8 +21,21 @@ class Worker(QThread):
+         self.params = params
+ 
+     def run(self):
++        audit = None
+         try:
+-            gh = GitHubClient(token=self.params.get("token"))
++            cfg = {}
++            cfg_path = self.params.get("config")
++            if cfg_path and Path(cfg_path).exists():
++                try:
++                    cfg = json.loads(Path(cfg_path).read_text(encoding="utf-8"))
++                except Exception:
++                    cfg = {}
++            audit_path = self.params.get("audit_file")
++            audit = AuditLogger(audit_path) if audit_path else None
++            if self.params.get("offline"):
++                gh = FixtureGitHubClient(self.params.get("fixtures_dir", "fixtures/sample"), token=self.params.get("token"), audit=audit)
++            else:
++                gh = GitHubClient(token=self.params.get("token"), audit=audit)
+             owner = self.params["owner"]
+             owner_type = self.params["owner_type"]
+             visibility = self.params.get("visibility", "all")
+@@ -39,6 +53,12 @@ class Worker(QThread):
+                 analyzer = RepoAnalyzer(gh, owner, target_branch_name=target_branch, concurrency=concurrency)
+                 status_rows = analyzer.summarize(subset)
+                 templates: Dict[str, str] = {}
++                cfg_tpl = cfg.get("templates") if isinstance(cfg.get("templates"), dict) else {}
++                if isinstance(cfg_tpl, dict):
++                    for k in ("readme", "license", "codeowners", "editorconfig", "workflow_ci"):
++                        v = cfg_tpl.get(k)
++                        if v and k not in templates and Path(v).exists():
++                            templates[k] = Path(v).read_text(encoding="utf-8")
+                 if self.params.get("tpl_readme"):
+                     p = Path(self.params["tpl_readme"])
+                     if p.exists():
+@@ -81,7 +101,12 @@ class Worker(QThread):
+                     default_main=self.params.get("default_main", False),
+                 )
+                 if self.params.get("dry_run", True):
+-                    self.result_ready.emit(plans)
++                    want_diffs = bool(self.params.get("crear_readme") or self.params.get("crear_license") or self.params.get("asegurar_workflows") or self.params.get("crear_codeowners") or self.params.get("crear_editorconfig"))
++                    if want_diffs and plans:
++                        default_branches = {r.get("name"): (r.get("default_branch") or target_branch) for r in status_rows if isinstance(r, dict) and r.get("name")}
++                        self.result_ready.emit(optimizer.preview(plans, default_branches))
++                    else:
++                        self.result_ready.emit(plans)
+                     return
+                 if self.params.get("crear_pr", False) and self.params.get("branch"):
+                     base_branch = status_rows[0].get("default_branch") or target_branch if status_rows else target_branch
+@@ -154,7 +179,8 @@ class Worker(QThread):
+                     if base_actions["auto_topics"]:
+                         add_topics = set(analysis.get("techs", []))
+                         cur_topics = set(gh.get_topics(owner, name))
+-                        merged = sorted(cur_topics | add_topics)
++                        extra = cfg.get("topics_extra") if isinstance(cfg.get("topics_extra"), list) else []
++                        merged = sorted(cur_topics | add_topics | set([t for t in extra if isinstance(t, str) and t.strip()]))
+                         if merged != list(cur_topics):
+                             if gh.set_topics(owner, name, merged):
+                                 executed.append("topics_updated")
+@@ -250,6 +276,101 @@ class Worker(QThread):
+                 return
+         except Exception as e:
+             self.error.emit(str(e))
++        finally:
++            if audit:
++                audit.close()
++
++
++class ReadmeWizard(QDialog):
++    def __init__(self, owner: str, repo: str, parent=None):
++        super().__init__(parent)
++        self.setWindowTitle("Asistente README")
++        self.saved_path = None
++        v = QVBoxLayout(self)
++        top = QHBoxLayout()
++        top.addWidget(QLabel("Stack"))
++        self.stack = QComboBox()
++        self.stack.addItems(["Python", "Node", "Go", "Rust", "Java", "Static"])
++        top.addWidget(self.stack)
++        v.addLayout(top)
++        self.preview = QTextEdit()
++        v.addWidget(self.preview)
++        btns = QHBoxLayout()
++        self.btn_save = QPushButton("Guardar")
++        self.btn_close = QPushButton("Cerrar")
++        btns.addWidget(self.btn_save)
++        btns.addWidget(self.btn_close)
++        v.addLayout(btns)
++        self._owner = owner or "OWNER"
++        self._repo = repo or "REPO"
++        self.stack.currentTextChanged.connect(self.render)
++        self.btn_save.clicked.connect(self.save)
++        self.btn_close.clicked.connect(self.reject)
++        self.render()
++
++    def render(self):
++        stack = self.stack.currentText()
++        repo = self._repo
++        owner = self._owner
++        install = ""
++        run_cmd = ""
++        test_cmd = ""
++        if stack == "Python":
++            install = "python -m venv .venv\nsource .venv/bin/activate\npip install -r requirements.txt"
++            run_cmd = "python main.py"
++            test_cmd = "python -m unittest -v"
++        elif stack == "Node":
++            install = "npm install"
++            run_cmd = "npm run dev"
++            test_cmd = "npm test"
++        elif stack == "Go":
++            install = "go mod download"
++            run_cmd = "go run ./..."
++            test_cmd = "go test ./..."
++        elif stack == "Rust":
++            install = "cargo build"
++            run_cmd = "cargo run"
++            test_cmd = "cargo test"
++        elif stack == "Java":
++            install = "mvn -q -DskipTests package"
++            run_cmd = "mvn -q exec:java"
++            test_cmd = "mvn -q test"
++        else:
++            install = "N/A"
++            run_cmd = "Abrir en navegador"
++            test_cmd = "N/A"
++        txt = f"""# {repo}
++
++## Qué es
++
++Repositorio de {owner}.
++
++## Instalación
++
++```bash
++{install}
++```
++
++## Uso
++
++```bash
++{run_cmd}
++```
++
++## Tests
++
++```bash
++{test_cmd}
++```
++"""
++        self.preview.setPlainText(txt)
++
++    def save(self):
++        p, _ = QFileDialog.getSaveFileName(self, "Guardar README", "README.md", "Markdown (*.md);;Todos (*)")
++        if p:
++            Path(p).write_text(self.preview.toPlainText(), encoding="utf-8")
++            self.saved_path = p
++            self.accept()
+ 
+ 
+ class MainWindow(QMainWindow):
+@@ -283,6 +404,17 @@ class MainWindow(QMainWindow):
+         top.addWidget(QLabel("Rama objetivo"))
+         self.target_branch = QLineEdit("main")
+         top.addWidget(self.target_branch)
++        self.cb_offline = QCheckBox("Offline")
++        top.addWidget(self.cb_offline)
++        self.fixtures_dir = QLineEdit("fixtures/sample")
++        top.addWidget(self.fixtures_dir)
++        self.btn_fixtures = QPushButton("Fixtures")
++        top.addWidget(self.btn_fixtures)
++        self.config = QLineEdit()
++        self.config.setPlaceholderText("config.json")
++        top.addWidget(self.config)
++        self.btn_config = QPushButton("Config")
++        top.addWidget(self.btn_config)
+         self.btn_status = QPushButton("Listar estado")
+         top.addWidget(self.btn_status)
+ 
+@@ -331,10 +463,12 @@ class MainWindow(QMainWindow):
+         vv.addLayout(g3)
+         g4 = QHBoxLayout()
+         self.btn_tpl_readme = QPushButton("Plantilla README")
++        self.btn_readme_wizard = QPushButton("Asistente README")
+         self.btn_tpl_license = QPushButton("Plantilla LICENSE")
+         self.btn_tpl_codeowners = QPushButton("Plantilla CODEOWNERS")
+         self.btn_tpl_editorconfig = QPushButton("Plantilla .editorconfig")
+         g4.addWidget(self.btn_tpl_readme)
++        g4.addWidget(self.btn_readme_wizard)
+         g4.addWidget(self.btn_tpl_license)
+         g4.addWidget(self.btn_tpl_codeowners)
+         g4.addWidget(self.btn_tpl_editorconfig)
+@@ -345,10 +479,12 @@ class MainWindow(QMainWindow):
+         self.btn_export_json = QPushButton("Exportar JSON")
+         self.btn_export_csv = QPushButton("Exportar CSV")
+         self.btn_export_html = QPushButton("Exportar HTML")
++        self.btn_save_log = QPushButton("Guardar log")
+         self.btn_apply = QPushButton("Aplicar")
+         export.addWidget(self.btn_export_json)
+         export.addWidget(self.btn_export_csv)
+         export.addWidget(self.btn_export_html)
++        export.addWidget(self.btn_save_log)
+         export.addWidget(self.btn_apply)
+         v.addLayout(export)
+ 
+@@ -413,7 +549,11 @@ class MainWindow(QMainWindow):
+         self.btn_export_json.clicked.connect(lambda: self.export_rows("json"))
+         self.btn_export_csv.clicked.connect(lambda: self.export_rows("csv"))
+         self.btn_export_html.clicked.connect(lambda: self.export_rows("html"))
++        self.btn_save_log.clicked.connect(self.save_log)
++        self.btn_fixtures.clicked.connect(self.pick_fixtures_dir)
++        self.btn_config.clicked.connect(self.pick_config)
+         self.btn_tpl_readme.clicked.connect(lambda: self.pick_tpl("readme"))
++        self.btn_readme_wizard.clicked.connect(self.open_readme_wizard)
+         self.btn_tpl_license.clicked.connect(lambda: self.pick_tpl("license"))
+         self.btn_tpl_codeowners.clicked.connect(lambda: self.pick_tpl("codeowners"))
+         self.btn_tpl_editorconfig.clicked.connect(lambda: self.pick_tpl("editorconfig"))
+@@ -439,6 +579,83 @@ class MainWindow(QMainWindow):
+                 self.tpl_editorconfig = p
+             self.log_msg(f"Plantilla {kind}: {p}")
+ 
++    def open_readme_wizard(self):
++        owner = self.owner.text().strip()
++        selected = self.selected_repo_names()
++        repo = selected[0] if len(selected) == 1 else ""
++        dlg = ReadmeWizard(owner, repo, self)
++        if dlg.exec() == QDialog.DialogCode.Accepted and dlg.saved_path:
++            self.tpl_readme = dlg.saved_path
++            self.log_msg(f"Plantilla readme (wizard): {dlg.saved_path}")
++
++    def pick_fixtures_dir(self):
++        p = QFileDialog.getExistingDirectory(self, "Selecciona carpeta de fixtures", self.fixtures_dir.text().strip() or "")
++        if p:
++            self.fixtures_dir.setText(p)
++            self.log_msg(f"Fixtures: {p}")
++
++    def pick_config(self):
++        p, _ = QFileDialog.getOpenFileName(self, "Selecciona config.json", "", "JSON (*.json);;Todos (*)")
++        if p:
++            self.config.setText(p)
++            self.log_msg(f"Config: {p}")
++            try:
++                cfg = json.loads(Path(p).read_text(encoding="utf-8"))
++            except Exception:
++                return
++            defaults = cfg.get("defaults") if isinstance(cfg, dict) else {}
++            if not isinstance(defaults, dict):
++                return
++            tb = None
++            if isinstance(defaults.get("branch_objetivo"), str) and defaults.get("branch_objetivo").strip():
++                tb = defaults.get("branch_objetivo").strip()
++            if isinstance(defaults.get("target_branch"), str) and defaults.get("target_branch").strip():
++                tb = defaults.get("target_branch").strip()
++            if tb:
++                self.target_branch.setText(tb)
++            if isinstance(defaults.get("crear_readme"), bool):
++                self.cb_readme.setChecked(defaults["crear_readme"])
++            if isinstance(defaults.get("crear_license"), str):
++                self.cb_license.setChecked(bool(defaults["crear_license"]))
++            if isinstance(defaults.get("asegurar_workflows"), bool):
++                self.cb_workflows.setChecked(defaults["asegurar_workflows"])
++            if isinstance(defaults.get("habilitar_issues"), bool):
++                self.cb_issues.setChecked(defaults["habilitar_issues"])
++            if isinstance(defaults.get("crear_codeowners"), bool):
++                self.cb_codeowners.setChecked(defaults["crear_codeowners"])
++            if isinstance(defaults.get("crear_editorconfig"), bool):
++                self.cb_editorconfig.setChecked(defaults["crear_editorconfig"])
++            if isinstance(defaults.get("proteger_branch"), bool):
++                self.cb_protect.setChecked(defaults["proteger_branch"])
++            if isinstance(defaults.get("renombrar_branch"), bool):
++                self.cb_rename.setChecked(defaults["renombrar_branch"])
++            if isinstance(defaults.get("asegurar_main"), bool):
++                self.cb_main.setChecked(defaults["asegurar_main"])
++            if isinstance(defaults.get("default_main"), bool):
++                self.cb_default_main.setChecked(defaults["default_main"])
++            if isinstance(defaults.get("auto_topics"), bool):
++                self.cb_auto_topics.setChecked(defaults["auto_topics"])
++            if isinstance(defaults.get("auto_description"), bool):
++                self.cb_auto_desc.setChecked(defaults["auto_description"])
++            if isinstance(defaults.get("gitignore_auto"), bool):
++                self.cb_gitignore.setChecked(defaults["gitignore_auto"])
++            if isinstance(defaults.get("issues_templates"), bool):
++                self.cb_issue_tpl.setChecked(defaults["issues_templates"])
++            if isinstance(defaults.get("pr_template"), bool):
++                self.cb_pr_tpl.setChecked(defaults["pr_template"])
++            if isinstance(defaults.get("generar_readme_auto"), bool):
++                self.cb_readme_auto.setChecked(defaults["generar_readme_auto"])
++            if isinstance(defaults.get("forzar_readme"), bool):
++                self.cb_readme_force.setChecked(defaults["forzar_readme"])
++            if isinstance(defaults.get("recomendar_licencia"), bool):
++                self.cb_lic_rec.setChecked(defaults["recomendar_licencia"])
++            if isinstance(defaults.get("aplicar_licencia"), bool):
++                self.cb_lic_apply.setChecked(defaults["aplicar_licencia"])
++            if isinstance(defaults.get("workflows_ai"), bool):
++                self.cb_wf_ai.setChecked(defaults["workflows_ai"])
++            if isinstance(defaults.get("pages_static"), bool):
++                self.cb_pages.setChecked(defaults["pages_static"])
++
+     def load_status(self):
+         token = self.token.text().strip() or None
+         owner = self.owner.text().strip()
+@@ -452,6 +669,9 @@ class MainWindow(QMainWindow):
+             "visibility": self.visibility.currentText(),
+             "concurrency": self.concurrency.value(),
+             "target_branch": self.target_branch.text().strip() or "main",
++            "offline": self.cb_offline.isChecked(),
++            "fixtures_dir": self.fixtures_dir.text().strip() or "fixtures/sample",
++            "config": self.config.text().strip() or None,
+         }
+         self.worker = Worker("status", params)
+         self.worker.status_ready.connect(self.show_status)
+@@ -493,6 +713,9 @@ class MainWindow(QMainWindow):
+         if not owner:
+             QMessageBox.warning(self, "Error", "Debes indicar owner")
+             return
++        out_dir = Path("reportes")
++        out_dir.mkdir(parents=True, exist_ok=True)
++        audit_file = str(out_dir / f"audit_gui_{int(time.time())}.jsonl")
+         params = {
+             "token": token,
+             "owner": owner,
+@@ -500,6 +723,10 @@ class MainWindow(QMainWindow):
+             "visibility": self.visibility.currentText(),
+             "concurrency": self.concurrency.value(),
+             "target_branch": self.target_branch.text().strip() or "main",
++            "audit_file": audit_file,
++            "offline": self.cb_offline.isChecked(),
++            "fixtures_dir": self.fixtures_dir.text().strip() or "fixtures/sample",
++            "config": self.config.text().strip() or None,
+             "selected_names": self.selected_repo_names(),
+             "crear_readme": self.cb_readme.isChecked(),
+             "crear_license": "mit" if self.cb_license.isChecked() else None,
+@@ -538,6 +765,9 @@ class MainWindow(QMainWindow):
+             "visibility": self.visibility.currentText(),
+             "concurrency": self.concurrency.value(),
+             "selected_names": self.selected_repo_names(),
++            "offline": self.cb_offline.isChecked(),
++            "fixtures_dir": self.fixtures_dir.text().strip() or "fixtures/sample",
++            "config": self.config.text().strip() or None,
+         }
+         self.worker = Worker("analyze", params)
+         self.worker.result_ready.connect(self.show_analysis)
+@@ -550,13 +780,20 @@ class MainWindow(QMainWindow):
+         if not owner:
+             QMessageBox.warning(self, "Error", "Debes indicar owner")
+             return
++        out_dir = Path("reportes")
++        out_dir.mkdir(parents=True, exist_ok=True)
++        audit_file = str(out_dir / f"audit_gui_{int(time.time())}.jsonl")
+         params = {
+             "token": token,
+             "owner": owner,
+             "owner_type": self.owner_type.currentText(),
+             "visibility": self.visibility.currentText(),
+             "concurrency": self.concurrency.value(),
++            "audit_file": audit_file,
+             "selected_names": self.selected_repo_names(),
++            "offline": self.cb_offline.isChecked(),
++            "fixtures_dir": self.fixtures_dir.text().strip() or "fixtures/sample",
++            "config": self.config.text().strip() or None,
+             "auto_topics": self.cb_auto_topics.isChecked(),
+             "auto_description": self.cb_auto_desc.isChecked(),
+             "gitignore_auto": self.cb_gitignore.isChecked(),
+@@ -583,6 +820,12 @@ class MainWindow(QMainWindow):
+             self.log_msg("Plan generado")
+             for r in rows:
+                 self.log_msg(f"{r['name']}: {r['actions']}")
++                if r.get("diffs"):
++                    for d in r.get("diffs", []):
++                        diff_text = d.get("diff") or ""
++                        if diff_text.strip():
++                            self.log_msg(f"{r['name']} {d.get('path','')}: {d.get('message','')}")
++                            self.log_msg(diff_text)
+         else:
+             self.log_msg("Acciones ejecutadas")
+             for r in rows:
+@@ -645,6 +888,13 @@ class MainWindow(QMainWindow):
+             write_html(self.rows, p, title="Estado repos")
+         self.log_msg(f"Exportado: {p}")
+ 
++    def save_log(self):
++        ts = int(time.time())
++        p, _ = QFileDialog.getSaveFileName(self, "Guardar log", f"log_{ts}.txt", "Texto (*.txt);;Todos (*)")
++        if p:
++            Path(p).write_text(self.log.toPlainText(), encoding="utf-8")
++            self.log_msg(f"Log guardado: {p}")
++
+ 
+ def main():
+     app = QApplication(sys.argv)
+diff --git a/tests/__init__.py b/tests/__init__.py
+new file mode 100644
+index 0000000..8b13789
+--- /dev/null
++++ b/tests/__init__.py
+@@ -0,0 +1 @@
++
+diff --git a/tests/test_gh_manager_unittest.py b/tests/test_gh_manager_unittest.py
+new file mode 100644
+index 0000000..f98d1ee
+--- /dev/null
++++ b/tests/test_gh_manager_unittest.py
+@@ -0,0 +1,138 @@
++import io
++import json
++import tempfile
++import unittest
++from unittest.mock import patch
++import argparse
++
++import gh_manager
++
++
++class FakeHTTPResponse:
++    def __init__(self, status, headers, body: bytes):
++        self._status = status
++        self.headers = headers
++        self._body = body
++        self.fp = io.BytesIO(body)
++
++    def getcode(self):
++        return self._status
++
++    def read(self):
++        return self._body
++
++    def __enter__(self):
++        return self
++
++    def __exit__(self, exc_type, exc, tb):
++        return False
++
++
++class TestGitHubClientPagination(unittest.TestCase):
++    def test_paginate_follows_next_link(self):
++        pages = [
++            (
++                200,
++                {"Link": '<https://api.github.com/users/x/repos?page=2>; rel="next"'},
++                json.dumps([{"name": "a"}]).encode(),
++            ),
++            (200, {}, json.dumps([{"name": "b"}]).encode()),
++        ]
++        calls = {"i": 0}
++
++        def fake_urlopen(req, timeout=60):
++            i = calls["i"]
++            calls["i"] += 1
++            status, headers, body = pages[i]
++            return FakeHTTPResponse(status, headers, body)
++
++        with patch("urllib.request.urlopen", new=fake_urlopen):
++            gh = gh_manager.GitHubClient(token=None)
++            items = gh._paginate("https://api.github.com/users/x/repos?per_page=100&type=all")
++            self.assertEqual([i["name"] for i in items], ["a", "b"])
++
++
++class TestAuditLogger(unittest.TestCase):
++    def test_audit_logger_writes_jsonl(self):
++        with tempfile.NamedTemporaryFile(delete=False) as tmp:
++            path = tmp.name
++        audit = gh_manager.AuditLogger(path)
++        audit.emit({"owner": "o", "repo": "r", "action": "x", "ok": True})
++        audit.close()
++        with open(path, "r", encoding="utf-8") as f:
++            lines = f.read().splitlines()
++        self.assertEqual(len(lines), 1)
++        obj = json.loads(lines[0])
++        self.assertEqual(obj["owner"], "o")
++        self.assertEqual(obj["repo"], "r")
++        self.assertEqual(obj["action"], "x")
++        self.assertEqual(obj["ok"], True)
++        self.assertIn("ts", obj)
++
++
++class TestOfflineFixtures(unittest.TestCase):
++    def test_offline_list_repos_works(self):
++        gh = gh_manager.FixtureGitHubClient("fixtures/sample")
++        repos = gh.list_repos("iago84", owner_type="user", visibility="all", archived=None)
++        self.assertEqual(len(repos), 1)
++        self.assertEqual(repos[0]["name"], "GITHUB_STATE_OF_MIND")
++
++
++class TestOptimizerPreview(unittest.TestCase):
++    def test_optimizer_preview_includes_diffs(self):
++        gh = gh_manager.FixtureGitHubClient("fixtures/sample")
++        opt = gh_manager.Optimizer(gh, owner="iago84", templates={"readme": "# {{REPO_NAME}}\n"})
++        status_rows = [
++            {
++                "name": "X",
++                "has_readme": False,
++                "has_license": False,
++                "has_workflows": False,
++                "issues_enabled": True,
++                "has_codeowners": False,
++                "has_editorconfig": False,
++                "branch_protected": False,
++                "branch_name_ok": True,
++                "default_branch": "main",
++            }
++        ]
++        plans = opt.plan(status_rows, create_readme=True, create_license="mit", ensure_workflows=True, enable_issues=False, create_codeowners=True, create_editorconfig=True)
++        preview = opt.preview(plans, {"X": "main"})
++        self.assertEqual(len(preview), 1)
++        diffs = [d for d in preview[0]["diffs"] if d.get("diff")]
++        self.assertTrue(any(d.get("path") == "README.md" for d in diffs))
++
++
++class TestTechInference(unittest.TestCase):
++    def test_infer_helm_kubernetes_terraform_monorepo(self):
++        deep = gh_manager.DeepAnalyzer(gh_manager.GitHubClient(token=None), owner="x")
++        techs = set(
++            deep._infer_techs(
++                {"Python": 1},
++                {},
++                [
++                    "k8s/deploy.yaml",
++                    "Chart.yaml",
++                    "values.yaml",
++                    "main.tf",
++                    "packages/app/package.json",
++                    "packages/lib/package.json",
++                ],
++            )
++        )
++        self.assertIn("kubernetes", techs)
++        self.assertIn("helm", techs)
++        self.assertIn("terraform", techs)
++        self.assertIn("monorepo", techs)
++
++
++class TestConfigDefaults(unittest.TestCase):
++    def test_apply_config_defaults_sets_missing_flags(self):
++        args = argparse.Namespace(auto_topics=False, visibility="all")
++        cfg = {"defaults": {"auto_topics": True}}
++        gh_manager.apply_config_defaults(args, [], cfg)
++        self.assertEqual(args.auto_topics, True)
++
++
++if __name__ == "__main__":
++    unittest.main()
+-- 
+2.43.0
+
